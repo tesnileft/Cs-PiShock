@@ -5,7 +5,7 @@ VisualStudioVersion = 17.5.002.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Cs-PiShock", "Cs-PiShock", "{F6139CC8-B03E-4132-A788-F0B9B23BC5FD}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CsPiShock", "Cs-PiShock\CsPiShock\CsPiShock.csproj", "{468EE4EE-D9D5-4327-A50F-0C5E298B17B5}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CsPiShock", "CsPiShock.csproj", "{468EE4EE-D9D5-4327-A50F-0C5E298B17B5}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

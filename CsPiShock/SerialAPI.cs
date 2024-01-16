@@ -5,6 +5,7 @@ using System.IO.Ports;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
+using System.Collections.Concurrent;
 using static Shocker;
 using Microsoft.VisualBasic;
 using Newtonsoft.Json;
@@ -13,6 +14,7 @@ using System.Text;
 using System.Data.SqlTypes;
 using System.Text.Json;
 using Newtonsoft.Json.Linq;
+using System.Security.Cryptography;
 
 /// <summary>
 /// Low level access to PiShock serial functionality
@@ -51,17 +53,59 @@ public class PiShockSerialApi
     private string? ComPort;
     SerialPort _serialPort = null!;
     const int InfoTimeout = 20;
+    ConcurrentQueue<OperationValues> _command_queue = new ConcurrentQueue<OperationValues>();
+    CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
 
     /// <summary>
     /// Main function for debugging
     /// </summary>
-    static void Main()
+    private static void Main()
     {
+        
+        
         PiShockSerialApi pishock = new PiShockSerialApi();
-        var info = pishock.Info();
-        Console.WriteLine(info.SelectToken("shockers"));
+        //SerialShocker s = new SerialShocker(8619, pishock);
+        //Console.WriteLine(pishock.Info()); //Print the info of the shocker
+        SerialShocker shockerA = new SerialShocker(8619, pishock);
+        SerialShocker shockerB = new SerialShocker(9509, pishock);
+
+        bool running = true;
+        while (running)
+        {
+            switch(Console.ReadLine())
+            {
+                case "Info":
+                Console.WriteLine(pishock.Info());
+                break;
+                case "Stop":
+                case "stop":
+                running = false;
+                break;
+                case "sa":
+                shockerA.Vibrate(100,100);
+                break;
+                case "sb":
+                shockerB.Vibrate(100,100);
+                break;
+                case "aandb":
+                shockerA.Vibrate(100,20);
+                Thread.Sleep(100);
+                shockerB.Vibrate(100,20);
+                break;
+            }
+        }
     }
 
+
+
+
+    /// <summary>
+    /// Mainly for debugginf the development of this, you should probably run this on a seperate thread
+    /// </summary>
+    void EnableDebug()
+    {
+        _serialPort.DataReceived += (s, e) => Console.WriteLine("Data received: " + _serialPort.ReadLine());
+    }
     PiShockSerialApi(string? providedPort = null)
     {
         ComPort = GetPort(providedPort);    //Get the com port
@@ -80,7 +124,6 @@ public class PiShockSerialApi
             {
                 Console.WriteLine(ComPort);
             return GetComPortWin();
-            
             }
             else
             {
@@ -103,37 +146,40 @@ public class PiShockSerialApi
             PortName = ComPort,
             BaudRate = 115200
         };
+        Console.WriteLine("Connecting to " + ComPort);
         _serialPort.Open();
         Console.WriteLine("Connected to " + ComPort);
+    }
+    public void Close()
+    {
+        _serialPort.Close();
     }
     
     /// <summary>
     /// Sends an operation to the PiShock
     /// </summary>
-    /// <param name="shocker_id"></param>
-    /// <param name="operation"></param>
-    /// <param name="duration"> Duration in ms </param>
-    /// <param name="intensity"></param>
-    void Operate(int shocker_id, SerialOperation operation, float duration, int? intensity = null)
+    /// <param name="shocker_id"> ID of the shocker </param>
+    /// <param name="operation"> <c>SerialOperation</c> representing the operation</param>
+    /// <param name="duration"> Duration in milliseconds </param>
+    /// <param name="intensity"> Range from 0 to 100 </param>
+    void Operate(int shocker_id, SerialOperation operation, int duration, int? intensity = null)
     {
         if(intensity != null && (0 > intensity | intensity > 100))
         {
             throw new Exception("Intensity must be between 0 and 100");
         }
-        if (duration < 0 | duration > (2^32))
+        if (duration < 0 | duration > (Math.Pow(2, 32) - 1))
         {
-            throw new Exception("Duration must be between 0 and 2^32");
+            throw new Exception($"Duration must be between 0 and 2^32, not {duration}");
         }
         PiCommand command = new PiCommand()
             {
-            cmd="operate",
-            value = new OperationValues(shocker_id, operation, (int)duration, intensity)
+                cmd="operate",
+                value = new OperationValues(shocker_id, operation, duration, intensity)
             };
-        SendCommand(command);
-        
+        SendCommand(command);  
     }
         
-    
     void SendCommand(PiCommand piCommand)
     {
         _serialPort.WriteLine(BuildCommand(piCommand));
@@ -149,20 +195,9 @@ public class PiShockSerialApi
 
     string BuildCommand(PiCommand piCommand)
     {
-        return JsonConvert.SerializeObject(piCommand, new JsonSerializerSettings
-        {
-            NullValueHandling = NullValueHandling.Ignore
-        });
+        return JsonConvert.SerializeObject(piCommand);
     }
-    /// <summary>
-    /// Gets the basic information of the PiShock
-    /// </summary>
-    /// <returns> A <c>BasicShockerInfo</c> object with the information of the PiShock</returns>
-    /// <exception cref="NotImplementedException"></exception>
-    BasicShockerInfo BasicInfo()
-    {
-        throw new NotImplementedException();
-    }
+
     public JObject Info(int timeOut = InfoTimeout, bool debug = false)
     {
         SendCommand("info");
@@ -187,18 +222,11 @@ public class PiShockSerialApi
 
             if (line.StartsWith(TERMINAL_INFO))
             {
-                string jsonString = line[TERMINAL_INFO.Length..];
                 return line[TERMINAL_INFO.Length..];
             }
             count++;
         }
         throw new TimeoutException("Timed out waiting for info, make sure the given device is indeed a PiShock");
-
-       
-    }
-    void DecodeInfo(string jsonString)
-    {
-
     }
     /// <summary>
     /// Windows specific method of obtaining the COM port the PiShock is connected to
@@ -241,6 +269,10 @@ public class PiShockSerialApi
         }  
     }
 
+    public void StartThread()
+    {
+        
+    }
     public void Dispose()
     {
         
@@ -252,7 +284,7 @@ public class PiShockSerialApi
     struct PiCommand
     {
         public string cmd { get ; set;}
-        public OperationValues? value {get ; set;} = null;
+        public OperationValues value {get ; set;}
         public PiCommand(string command)
         {
             cmd = command;
@@ -263,10 +295,10 @@ public class PiShockSerialApi
     /// </summary>
     struct OperationValues
     {
-        int? id { get; set;}
-        string? op { get; set;}
-        int? duration {get; set;}
-        int? intensity { get; set;}
+        public int id { get; set;}
+        public string op { get; set;}
+        public int? duration {get; set;}
+        public int? intensity { get; set;}
         /// <summary>
         /// Simple initializer for <c>OperationValues</c>
         /// </summary>
@@ -279,36 +311,56 @@ public class PiShockSerialApi
             id = shockerId;
             op = operations[(int) operation];
             duration = opDuration;
+            intensity = opIntensity;
         }
     }
+
+    struct ShockerCommand
+    {
+        public string cmd { get; set; }
+        public int? id { get; set; }
+        public SerialOperation? op { get; set; }
+        public int? duration { get; set; }
+        public int? intensity { get; set; }
+        public ShockerCommand(string command, int? id = null, SerialOperation? op = null, int? duration = null, int? intensity = null)
+        {
+            cmd = command;
+            this.id = id;
+            this.op = op;
+            this.duration = duration;
+            this.intensity = intensity;
+        }
+    }
+
     class SerialShocker : Shocker
     {
         private BasicShockerInfo info;
         private PiShockSerialApi api;
 
-        public SerialShocker(int  shockerId, PiShockSerialApi api)
+        public SerialShocker(int shockerId, PiShockSerialApi api)
         {   
-            this.info = _Info(shockerId);
             this.api = api;
+            this.info = _Info(shockerId);
         }
         public override string ToString()
         {
             return $"Serial shocker {info.ShockerId} ({api.ComPort})";
         }
-        public void Shock()
+        public void Shock(int duration, int intensity)
         {
 
+            api.Operate(info.ShockerId, SerialOperation.SHOCK, duration, intensity);
         }
         /// <summary>
         /// 
         /// </summary>
-        public void Vibrate(float duration, int intensity)
+        public void Vibrate(int duration, int intensity)
         {
             api.Operate(info.ShockerId, SerialOperation.VIBRATE, duration, intensity);
         }
-        public void Beep()
+        public void Beep(int duration)
         {
-
+            api.Operate(info.ShockerId, SerialOperation.BEEP, duration);
         }
         /// <summary>
         /// End the currently running operation
@@ -319,9 +371,26 @@ public class PiShockSerialApi
         }
         private BasicShockerInfo _Info(int shockerId)
         {
-            BasicShockerInfo info = new BasicShockerInfo(api.Info());
+            JObject terminalInfo = api.Info();
+            JToken shocker = terminalInfo.SelectToken("shockers")!.First(x => (int)x.SelectToken("id")! == shockerId);
+            if(shocker.SelectToken("id") == null | shocker.SelectToken("id")!.Value<int>() != shockerId)
+            {
+                throw new Exception("Shocker not found");
+            }
+            BasicShockerInfo info = new BasicShockerInfo()
+            {
+                IsSerial = true,
+                Name = "Serial Shocker " + shockerId,
+                ClientId = (int)terminalInfo.SelectToken("clientId")!,
+                ShockerId = shockerId,
+                IsPaused = shocker.SelectToken("paused")!.Value<bool>(),
+            };
             return info;
         }
+        /// <summary>
+        /// Get the basic information of the Shocker
+        /// </summary>
+        /// <returns> A <c>BasicShockerInfo</c> instance</returns>
         public BasicShockerInfo Info()
         {
             return info;

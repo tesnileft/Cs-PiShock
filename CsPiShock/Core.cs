@@ -2,30 +2,34 @@ using System.CodeDom;
 using System.Reflection.Metadata.Ecma335;
 using Newtonsoft.Json.Linq;
 
-public class Shocker
+public abstract class Shocker
 {
-//     """Base class for :class:`HTTPShocker <pishock.zap.httpapi.HTTPShocker>` and
-//     :class:`SerialShocker <pishock.zap.serialapi.SerialShocker>`.
+    //     """Base class for :class:`HTTPShocker <pishock.zap.httpapi.HTTPShocker>` and
+    //     :class:`SerialShocker <pishock.zap.serialapi.SerialShocker>`.
 
-//     Applications which only need access to
-//     :meth:`shock() <pishock.zap.httpapi.HTTPShocker.shock()>`,
-//     :meth:`vibrate() <pishock.zap.httpapi.HTTPShocker.vibrate()>`,
-//     :meth:`beep() <pishock.zap.httpapi.HTTPShocker.beep()>`, and
-//     :meth:`info() <pishock.zap.httpapi.HTTPShocker.info()>` (with
-//     :class:`BasicShockerInfo <pishock.zap.core.BasicShockerInfo>` only) can swap out a
-//     :class:`HTTPShocker <pishock.zap.httpapi.HTTPShocker>` for a
-//     :class:`SerialShocker <pishock.zap.serialapi.SerialShocker>` (with only
-//     initialization changing) to support both APIs.
-//     """
+    //     Applications which only need access to
+    //     :meth:`shock() <pishock.zap.httpapi.HTTPShocker.shock()>`,
+    //     :meth:`vibrate() <pishock.zap.httpapi.HTTPShocker.vibrate()>`,
+    //     :meth:`beep() <pishock.zap.httpapi.HTTPShocker.beep()>`, and
+    //     :meth:`info() <pishock.zap.httpapi.HTTPShocker.info()>` (with
+    //     :class:`BasicShockerInfo <pishock.zap.core.BasicShockerInfo>` only) can swap out a
+    //     :class:`HTTPShocker <pishock.zap.httpapi.HTTPShocker>` for a
+    //     :class:`SerialShocker <pishock.zap.serialapi.SerialShocker>` (with only
+    //     initialization changing) to support both APIs.
+    //     """
 
-bool IsSerial;
+#pragma warning disable CA1822 // Mark members as static
+    void Shock(float duration, int intensity)
+#pragma warning restore CA1822 // Mark members as static
+    {
 
-void Shock(float duration, int intensity)
-{
     throw new NotImplementedException();
 }
 void Vibrate()
 {
+    {
+
+    }
     throw new NotImplementedException();
 }
 
@@ -36,6 +40,7 @@ void Beep()
 
 BasicShockerInfo Info()
 {
+    
     throw new NotImplementedException();
 }
 
@@ -62,7 +67,7 @@ public class BasicShockerInfo
     public int ShockerId { get; set; }
     public bool IsPaused { get; set; }
     public bool IsSerial { get; set; }
-    private BasicShockerInfo()
+    public BasicShockerInfo() //Diy lol
     {}
     public BasicShockerInfo (JObject data, string? name = null)
     {
