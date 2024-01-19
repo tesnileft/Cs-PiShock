@@ -9,7 +9,7 @@
     <Title>C# PiShock API</Title>
     <Authors>Tesni</Authors>
     <Description>A C# Implementation of the API for the PiShock</Description>
-    <Version>0.62.1</Version>
+    <Version>0.8</Version>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <Copyright>GNU GPLv3</Copyright>
   </PropertyGroup>

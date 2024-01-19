@@ -53,16 +53,15 @@ public class PiShockSerialApi
     private string? ComPort;
     SerialPort _serialPort = null!;
     const int InfoTimeout = 20;
-    ConcurrentQueue<OperationValues> _command_queue = new ConcurrentQueue<OperationValues>();
+    ConcurrentQueue<ShockerCommand> _command_queue = new ConcurrentQueue<ShockerCommand>();
     CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
+    List<SerialShocker> serialShockers = new List<SerialShocker>();
 
     /// <summary>
     /// Main function for debugging
     /// </summary>
     private static void Main()
     {
-        
-        
         PiShockSerialApi pishock = new PiShockSerialApi();
         //SerialShocker s = new SerialShocker(8619, pishock);
         //Console.WriteLine(pishock.Info()); //Print the info of the shocker
@@ -79,6 +78,7 @@ public class PiShockSerialApi
                 break;
                 case "Stop":
                 case "stop":
+                pishock.Dispose();
                 running = false;
                 break;
                 case "sa":
@@ -95,10 +95,6 @@ public class PiShockSerialApi
             }
         }
     }
-
-
-
-
     /// <summary>
     /// Mainly for debugginf the development of this, you should probably run this on a seperate thread
     /// </summary>
@@ -110,6 +106,7 @@ public class PiShockSerialApi
     {
         ComPort = GetPort(providedPort);    //Get the com port
         Connect();                          //Initialize the serial port
+        StartThread();
     }
 
     /// <summary>
@@ -150,10 +147,7 @@ public class PiShockSerialApi
         _serialPort.Open();
         Console.WriteLine("Connected to " + ComPort);
     }
-    public void Close()
-    {
-        _serialPort.Close();
-    }
+
     
     /// <summary>
     /// Sends an operation to the PiShock
@@ -162,23 +156,7 @@ public class PiShockSerialApi
     /// <param name="operation"> <c>SerialOperation</c> representing the operation</param>
     /// <param name="duration"> Duration in milliseconds </param>
     /// <param name="intensity"> Range from 0 to 100 </param>
-    void Operate(int shocker_id, SerialOperation operation, int duration, int? intensity = null)
-    {
-        if(intensity != null && (0 > intensity | intensity > 100))
-        {
-            throw new Exception("Intensity must be between 0 and 100");
-        }
-        if (duration < 0 | duration > (Math.Pow(2, 32) - 1))
-        {
-            throw new Exception($"Duration must be between 0 and 2^32, not {duration}");
-        }
-        PiCommand command = new PiCommand()
-            {
-                cmd="operate",
-                value = new OperationValues(shocker_id, operation, duration, intensity)
-            };
-        SendCommand(command);  
-    }
+    
         
     void SendCommand(PiCommand piCommand)
     {
@@ -271,11 +249,56 @@ public class PiShockSerialApi
 
     public void StartThread()
     {
-        
+        CancellationToken cancellationToken = _cancellationTokenSource.Token;
+        new Thread(() =>
+        {
+            while (true)
+            {
+                if (_command_queue.TryDequeue(out var eQ))
+                {
+                        if (eQ.intensity != null && (0 > eQ.intensity | eQ.intensity > 100))
+                        {
+                            throw new Exception("Intensity must be between 0 and 100");
+                        }
+                        if (eQ.duration < 0 | eQ.duration > (Math.Pow(2, 32) - 1))
+                        {
+                            throw new Exception($"Duration must be between 0 and 2^32, not {eQ.duration}");
+                        }
+                        PiCommand command = new PiCommand()
+                        {
+                            cmd = eQ.cmd,
+                            value = eQ.id == null ? null : 
+                            new OperationValues((int)eQ.id, eQ.op, eQ.duration, eQ.intensity)
+                        };
+                        SendCommand(command);
+                    
+                    //Do command stuff
+                }
+                if (cancellationToken.IsCancellationRequested)
+                {
+
+                    break;
+                }
+            }
+            
+
+        }).Start();
     }
+    /// <summary>
+    /// Dispose of all resources used by the class (use this to properly close the ports/thread)
+    /// </summary>
     public void Dispose()
     {
-        
+        //We probably want to set all the shockers to be off by this point
+        foreach (SerialShocker shocker in serialShockers)
+        {
+            shocker.End();
+            Thread.Sleep(100); //Wait 100 ms to ensure every command is not executed too fast (and thus is actually picked up by the PiShock)
+        }
+
+        //Close our port and thread
+        _serialPort.Close();   
+        _cancellationTokenSource.Cancel();
     }
 
     /// <summary>
@@ -284,7 +307,7 @@ public class PiShockSerialApi
     struct PiCommand
     {
         public string cmd { get ; set;}
-        public OperationValues value {get ; set;}
+        public OperationValues? value {get ; set;}
         public PiCommand(string command)
         {
             cmd = command;
@@ -295,8 +318,8 @@ public class PiShockSerialApi
     /// </summary>
     struct OperationValues
     {
-        public int id { get; set;}
-        public string op { get; set;}
+        public int? id { get; set;}
+        public string? op { get; set;}
         public int? duration {get; set;}
         public int? intensity { get; set;}
         /// <summary>
@@ -305,7 +328,7 @@ public class PiShockSerialApi
         /// <param name="shockerId"> ID of the shocker </param>
         /// <param name="operation"> Type of operation (Takes a value from <c>SerialOperation</c>)</param>
         /// <param name="opIntensity"></param>
-        public OperationValues(int shockerId, SerialOperation operation, int opDuration, int? opIntensity=null)
+        public OperationValues(int? shockerId, SerialOperation? operation, int? opDuration, int? opIntensity=null)
         {
             string[] operations = {"end", "shock", "vibrate", "beep"};
             id = shockerId;
@@ -314,7 +337,9 @@ public class PiShockSerialApi
             intensity = opIntensity;
         }
     }
-
+    /// <summary>
+    /// Help struct that is sent to the processing thread to then be sent to the pishock async from the main thread.
+    /// </summary>
     struct ShockerCommand
     {
         public string cmd { get; set; }
@@ -349,25 +374,58 @@ public class PiShockSerialApi
         public void Shock(int duration, int intensity)
         {
 
-            api.Operate(info.ShockerId, SerialOperation.SHOCK, duration, intensity);
+            api._command_queue.Enqueue(new
+                ShockerCommand(
+                    "operate",
+                    info.ShockerId,
+                    SerialOperation.SHOCK,
+                    duration,
+                    intensity
+                    )
+                );
+            //api.Operate(info.ShockerId, SerialOperation.SHOCK, duration, intensity);
         }
         /// <summary>
         /// 
         /// </summary>
         public void Vibrate(int duration, int intensity)
         {
-            api.Operate(info.ShockerId, SerialOperation.VIBRATE, duration, intensity);
+            api._command_queue.Enqueue(new
+                ShockerCommand(
+                    "operate",
+                    info.ShockerId,
+                    SerialOperation.VIBRATE,
+                    duration,
+                    intensity
+                    )
+                );
+            //api.Operate(info.ShockerId, SerialOperation.VIBRATE, duration, intensity);
         }
         public void Beep(int duration)
         {
-            api.Operate(info.ShockerId, SerialOperation.BEEP, duration);
+            api._command_queue.Enqueue(new
+                ShockerCommand(
+                    "operate",
+                    info.ShockerId,
+                    SerialOperation.VIBRATE,
+                    duration
+                    )
+                );
+            //api.Operate(info.ShockerId, SerialOperation.BEEP, duration);
         }
         /// <summary>
         /// End the currently running operation
         /// </summary>
         public void End()
         {
-            api.Operate(info.ShockerId, SerialOperation.END, 0);
+            api._command_queue.Enqueue(new
+                ShockerCommand(
+                    "operate",
+                    info.ShockerId,
+                    SerialOperation.END
+                    )
+                );
+            //api.Operate(info.ShockerId, SerialOperation.END, 0);
         }
         private BasicShockerInfo _Info(int shockerId)
         {
