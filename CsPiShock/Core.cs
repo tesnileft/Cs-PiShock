@@ -44,8 +44,11 @@ BasicShockerInfo Info()
     throw new NotImplementedException();
 }
 
-// @dataclasses.dataclass
-public class BasicShockerInfo
+    /// <summary>
+    /// Used by <c> PiShockAPI.GetShockers()</c> and <c>SerialShocker.Info()</c>
+    /// Calling <c> HTTPShocker.info() </c> instead returns <c> HTTPShocker.info() </c>
+    /// </summary>
+    public class BasicShockerInfo
 {
 //    """Basic information about a shocker.
 
@@ -78,9 +81,6 @@ public class BasicShockerInfo
         ShockerId = (int)data.SelectToken("id")!;
         IsPaused = (bool)data.SelectToken("paused")!;
     }
-}
-
-}
 
 public class NotImplementedException : Exception
 {
