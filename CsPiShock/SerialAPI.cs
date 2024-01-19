@@ -298,7 +298,8 @@ public class PiShockSerialApi
             {
                 if (_command_queue.TryDequeue(out PiCommand command))
                 {
-                    _serialPort.WriteLine(BuildCommand(command));
+                    string jsonString = BuildCommand(command);
+                    _serialPort.WriteLine(jsonString);
                 }
                 if (cancellationToken.IsCancellationRequested)
                 {
@@ -328,7 +329,7 @@ public class PiShockSerialApi
     {
         OperationValues values = new OperationValues(shockerId, operation, duration, intensity);
         PiCommand cmd = new PiCommand("operate", values);
-       
+        SendCommand(cmd);
     }
     /// <summary>
     /// Help struct to generate JSON strings to send to the pishock
