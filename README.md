@@ -1,6 +1,6 @@
 # PiShock for C#
 
-The _bester_ (And I think only (don't quote me on that)) C# API wrapper for the Pishock
+The _bester_ (And I think only (don't quote me on that)) C# API wrapper for the Pishock.
 This is a C# adaptation of Zerario's [Python PiShock API](https://github.com/zerario/Python-PiShock)
 > If you don't know what [PiShock](https://pishock.com/#/) is, you have no reason to be here.
 
