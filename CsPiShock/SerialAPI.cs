@@ -15,6 +15,7 @@ using System.Data.SqlTypes;
 using System.Text.Json;
 using Newtonsoft.Json.Linq;
 using System.Security.Cryptography;
+using System.Xml.Linq;
 
 /// <summary>
 /// Low level access to PiShock serial functionality
@@ -36,7 +37,7 @@ public class PiShockSerialApi
     /// <para>END:      End the current operation.</para>
     /// </summary>
     
-    enum SerialOperation 
+    public enum SerialOperation 
     {
         SHOCK = 1,
         VIBRATE = 2,
@@ -53,7 +54,7 @@ public class PiShockSerialApi
     private string? ComPort;
     SerialPort _serialPort = null!;
     const int InfoTimeout = 20;
-    ConcurrentQueue<ShockerCommand> _command_queue = new ConcurrentQueue<ShockerCommand>();
+    ConcurrentQueue<PiCommand> _command_queue = new ConcurrentQueue<PiCommand>();
     CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
     List<SerialShocker> serialShockers = new List<SerialShocker>();
 
@@ -96,13 +97,13 @@ public class PiShockSerialApi
         }
     }
     /// <summary>
-    /// Mainly for debugginf the development of this, you should probably run this on a seperate thread
+    /// Mainly for debugging the development of this, you should probably run this on a seperate thread
     /// </summary>
-    void EnableDebug()
+    public void EnableDebug()
     {
         _serialPort.DataReceived += (s, e) => Console.WriteLine("Data received: " + _serialPort.ReadLine());
     }
-    PiShockSerialApi(string? providedPort = null)
+    public PiShockSerialApi(string? providedPort = null)
     {
         ComPort = GetPort(providedPort);    //Get the com port
         Connect();                          //Initialize the serial port
@@ -113,7 +114,7 @@ public class PiShockSerialApi
     /// Initializes the port that will be used for serial
     /// </summary>
     /// <param name="providedPort"> Only needs to be provided if the OS is not Windows, but if you have a custom port you can provide it </param>
-    string GetPort(string? providedPort = null)
+    private string GetPort(string? providedPort = null)
     {
         if (providedPort == null)
         {
@@ -136,14 +137,13 @@ public class PiShockSerialApi
     /// <summary>
     /// Initializes the connection to the PiShock over serial
     /// </summary>
-    void Connect()
+    private void Connect()
     {
         _serialPort = new SerialPort
         {
             PortName = ComPort,
             BaudRate = 115200
         };
-        Console.WriteLine("Connecting to " + ComPort);
         _serialPort.Open();
         Console.WriteLine("Connected to " + ComPort);
     }
@@ -156,22 +156,20 @@ public class PiShockSerialApi
     /// <param name="operation"> <c>SerialOperation</c> representing the operation</param>
     /// <param name="duration"> Duration in milliseconds </param>
     /// <param name="intensity"> Range from 0 to 100 </param>
-    
-        
-    void SendCommand(PiCommand piCommand)
+    private void SendCommand(PiCommand piCommand)
     {
-        _serialPort.WriteLine(BuildCommand(piCommand));
+        _command_queue.Enqueue(piCommand);
     }   
-    void SendCommand(string command)
+    private void SendCommand(string command)
     {
         PiCommand piCommand = new PiCommand
         {
             cmd = command
         };
-        _serialPort.WriteLine(BuildCommand(piCommand));
+        _command_queue.Enqueue(piCommand);
     }
 
-    string BuildCommand(PiCommand piCommand)
+    private string BuildCommand(PiCommand piCommand)
     {
         return JsonConvert.SerializeObject(piCommand);
     }
@@ -188,7 +186,7 @@ public class PiShockSerialApi
     /// <param name="debug"></param>
     /// <returns>JSON string of the info</returns>
     /// <exception cref="TimeoutException"></exception>
-    string WaitInfo(int timeOut = InfoTimeout, bool debug = false)
+    private string WaitInfo(int timeOut = InfoTimeout, bool debug = false)
     {
         int count = 0;
         while(timeOut > count)
@@ -205,6 +203,50 @@ public class PiShockSerialApi
             count++;
         }
         throw new TimeoutException("Timed out waiting for info, make sure the given device is indeed a PiShock");
+    }
+
+    public void AddNetwork(string ssid, string pass)
+    {
+        PiCommand networkCommand = new PiCommand
+        {
+            cmd = "addnetwork",
+            value = new NetworkValues
+            {
+                ssid = ssid,
+                password = pass
+            }
+        };
+        SendCommand(networkCommand);
+    }
+
+    public void RemoveNetwork(string ssid)
+    {
+        PiCommand networkCommand = new PiCommand
+        {
+            cmd = "removenetwork",
+            value = new NetworkValues
+            {
+                ssid = ssid,
+            }
+        };
+        SendCommand(networkCommand);
+    }
+    public void TryConnect(string ssid, string pass)
+    {
+        PiCommand networkCommand = new PiCommand
+        {
+            cmd = "connect",
+            value = new NetworkValues
+            {
+                ssid = ssid,
+                password = pass
+            }
+        };
+        SendCommand(networkCommand);
+    }
+    public void Restart()
+    {
+        SendCommand("restart");
     }
     /// <summary>
     /// Windows specific method of obtaining the COM port the PiShock is connected to
@@ -247,41 +289,22 @@ public class PiShockSerialApi
         }  
     }
 
-    public void StartThread()
+    private void StartThread()
     {
         CancellationToken cancellationToken = _cancellationTokenSource.Token;
-        new Thread(() =>
+        new Thread(() =>    
         {
             while (true)
             {
-                if (_command_queue.TryDequeue(out var eQ))
+                if (_command_queue.TryDequeue(out PiCommand command))
                 {
-                        if (eQ.intensity != null && (0 > eQ.intensity | eQ.intensity > 100))
-                        {
-                            throw new Exception("Intensity must be between 0 and 100");
-                        }
-                        if (eQ.duration < 0 | eQ.duration > (Math.Pow(2, 32) - 1))
-                        {
-                            throw new Exception($"Duration must be between 0 and 2^32, not {eQ.duration}");
-                        }
-                        PiCommand command = new PiCommand()
-                        {
-                            cmd = eQ.cmd,
-                            value = eQ.id == null ? null : 
-                            new OperationValues((int)eQ.id, eQ.op, eQ.duration, eQ.intensity)
-                        };
-                        SendCommand(command);
-                    
-                    //Do command stuff
+                    _serialPort.WriteLine(BuildCommand(command));
                 }
                 if (cancellationToken.IsCancellationRequested)
                 {
-
                     break;
                 }
             }
-            
-
         }).Start();
     }
     /// <summary>
@@ -301,22 +324,29 @@ public class PiShockSerialApi
         _cancellationTokenSource.Cancel();
     }
 
+    public void Operate(int shockerId, SerialOperation operation, int? duration = null, int? intensity = null)
+    {
+        OperationValues values = new OperationValues(shockerId, operation, duration, intensity);
+        PiCommand cmd = new PiCommand("operate", values);
+       
+    }
     /// <summary>
     /// Help struct to generate JSON strings to send to the pishock
     /// </summary>
     struct PiCommand
     {
         public string cmd { get ; set;}
-        public OperationValues? value {get ; set;}
-        public PiCommand(string command)
+        public dynamic? value {get ; set;}
+        public PiCommand(string command, dynamic? values = null)
         {
             cmd = command;
+            value = values;
         }
     }
     /// <summary>
     /// Help struct to generate JSON strings to send to the PiShock
     /// </summary>
-    struct OperationValues
+    private struct OperationValues
     {
         public int? id { get; set;}
         public string? op { get; set;}
@@ -328,7 +358,7 @@ public class PiShockSerialApi
         /// <param name="shockerId"> ID of the shocker </param>
         /// <param name="operation"> Type of operation (Takes a value from <c>SerialOperation</c>)</param>
         /// <param name="opIntensity"></param>
-        public OperationValues(int? shockerId, SerialOperation? operation, int? opDuration, int? opIntensity=null)
+        public OperationValues(int shockerId, SerialOperation operation, int? opDuration = null, int? opIntensity=null)
         {
             string[] operations = {"end", "shock", "vibrate", "beep"};
             id = shockerId;
@@ -337,10 +367,23 @@ public class PiShockSerialApi
             intensity = opIntensity;
         }
     }
+    private struct NetworkValues
+    {
+        public string ssid { get; set;}
+        public string? password { get; set;}
+        public NetworkValues(string ssid, string? pass = null)
+        {
+            this.ssid = ssid;
+            password = pass;
+        }
+    }
+
+
+
     /// <summary>
     /// Help struct that is sent to the processing thread to then be sent to the pishock async from the main thread.
     /// </summary>
-    struct ShockerCommand
+    private struct ShockerCommand
     {
         public string cmd { get; set; }
         public int? id { get; set; }
@@ -373,59 +416,25 @@ public class PiShockSerialApi
         }
         public void Shock(int duration, int intensity)
         {
-
-            api._command_queue.Enqueue(new
-                ShockerCommand(
-                    "operate",
-                    info.ShockerId,
-                    SerialOperation.SHOCK,
-                    duration,
-                    intensity
-                    )
-                );
-            //api.Operate(info.ShockerId, SerialOperation.SHOCK, duration, intensity);
+            api.Operate(info.ShockerId, SerialOperation.SHOCK, duration, intensity);
         }
         /// <summary>
         /// 
         /// </summary>
         public void Vibrate(int duration, int intensity)
         {
-            api._command_queue.Enqueue(new
-                ShockerCommand(
-                    "operate",
-                    info.ShockerId,
-                    SerialOperation.VIBRATE,
-                    duration,
-                    intensity
-                    )
-                );
-            //api.Operate(info.ShockerId, SerialOperation.VIBRATE, duration, intensity);
+            api.Operate(info.ShockerId, SerialOperation.VIBRATE, duration, intensity);
         }
         public void Beep(int duration)
         {
-            api._command_queue.Enqueue(new
-                ShockerCommand(
-                    "operate",
-                    info.ShockerId,
-                    SerialOperation.VIBRATE,
-                    duration
-                    )
-                );
-            //api.Operate(info.ShockerId, SerialOperation.BEEP, duration);
+            api.Operate(info.ShockerId, SerialOperation.BEEP, duration);
         }
         /// <summary>
         /// End the currently running operation
         /// </summary>
         public void End()
         {
-            api._command_queue.Enqueue(new
-                ShockerCommand(
-                    "operate",
-                    info.ShockerId,
-                    SerialOperation.END
-                    )
-                );
-            //api.Operate(info.ShockerId, SerialOperation.END, 0);
+            api.Operate(info.ShockerId, SerialOperation.END);
         }
         private BasicShockerInfo _Info(int shockerId)
         {
