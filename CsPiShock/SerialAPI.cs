@@ -10,18 +10,19 @@
     using Newtonsoft.Json;
     using Microsoft.Win32;
     using Newtonsoft.Json.Linq;
+    using static CsPiShock.ApiBase;
 
 
     /// <summary>
     /// Low level access to PiShock serial functionality
     /// </summary>
-    class PiShockSerialApi : ApiBase
+    public class PiShockSerialApi : ApiBase
     {
         //Possible VID and PID port values for the PiShock
         static List<(int, int)> USB_IDS = new List<(int, int)>(){
-    (0x1A86, 0x7523),  //CH340, PiShock Next
-    (0x1A86, 0x55D4),  //CH9102, PiShock Lite
-    };
+            (0x1A86, 0x7523),  //CH340, PiShock Next
+            (0x1A86, 0x55D4),  //CH9102, PiShock Lite
+         };
 
         enum DeviceType
         {
@@ -30,7 +31,7 @@
         }
         const string TERMINAL_INFO = "TERMINALINFO: ";
         //Class variables
-        private string? ComPort;
+        public string? ComPort;
         SerialPort _serialPort = null!;
         const int InfoTimeout = 20;
         ConcurrentQueue<PiCommand> _command_queue = new ConcurrentQueue<PiCommand>();
@@ -271,10 +272,6 @@
             PiCommand cmd = new PiCommand("operate", values);
             SendCommand(cmd);
         }
-
-
-
-
         /// <summary>
         /// Help struct that is sent to the processing thread to then be sent to the pishock async from the main thread.
         /// </summary>
@@ -295,68 +292,68 @@
             }
         }
 
-        public class SerialShocker : Shocker
-        {
-            private BasicShockerInfo info;
-            private PiShockSerialApi api;
+    }
+    public class SerialShocker : Shocker
+    {
+        private BasicShockerInfo info;
+        private PiShockSerialApi api;
 
-            public SerialShocker(int shockerId, PiShockSerialApi api)
+        public SerialShocker(int shockerId, PiShockSerialApi api)
+        {
+            this.api = api;
+            this.info = _Info(shockerId);
+        }
+        public override string ToString()
+        {
+            return $"Serial shocker {info.ShockerId} ({api.ComPort})";
+        }
+        public void Shock(int duration, int intensity)
+        {
+            api.Operate(info.ShockerId, SerialOperation.SHOCK, duration, intensity);
+        }
+        /// <summary>
+        /// 
+        /// </summary>
+        public void Vibrate(int duration, int intensity)
+        {
+            api.Operate(info.ShockerId, SerialOperation.VIBRATE, duration, intensity);
+        }
+        public void Beep(int duration)
+        {
+            api.Operate(info.ShockerId, SerialOperation.BEEP, duration);
+        }
+        /// <summary>
+        /// End the currently running operation
+        /// </summary>
+        public void End()
+        {
+            api.Operate(info.ShockerId, SerialOperation.END);
+        }
+        private BasicShockerInfo _Info(int shockerId)
+        {
+            JObject terminalInfo = api.Info();
+            JToken shocker = terminalInfo.SelectToken("shockers")!.First(x => (int)x.SelectToken("id")! == shockerId);
+            if (shocker.SelectToken("id") == null | shocker.SelectToken("id")!.Value<int>() != shockerId)
             {
-                this.api = api;
-                this.info = _Info(shockerId);
+                throw new Exception("Shocker not found");
             }
-            public override string ToString()
+            BasicShockerInfo info = new BasicShockerInfo()
             {
-                return $"Serial shocker {info.ShockerId} ({api.ComPort})";
-            }
-            public void Shock(int duration, int intensity)
-            {
-                api.Operate(info.ShockerId, SerialOperation.SHOCK, duration, intensity);
-            }
-            /// <summary>
-            /// 
-            /// </summary>
-            public void Vibrate(int duration, int intensity)
-            {
-                api.Operate(info.ShockerId, SerialOperation.VIBRATE, duration, intensity);
-            }
-            public void Beep(int duration)
-            {
-                api.Operate(info.ShockerId, SerialOperation.BEEP, duration);
-            }
-            /// <summary>
-            /// End the currently running operation
-            /// </summary>
-            public void End()
-            {
-                api.Operate(info.ShockerId, SerialOperation.END);
-            }
-            private BasicShockerInfo _Info(int shockerId)
-            {
-                JObject terminalInfo = api.Info();
-                JToken shocker = terminalInfo.SelectToken("shockers")!.First(x => (int)x.SelectToken("id")! == shockerId);
-                if (shocker.SelectToken("id") == null | shocker.SelectToken("id")!.Value<int>() != shockerId)
-                {
-                    throw new Exception("Shocker not found");
-                }
-                BasicShockerInfo info = new BasicShockerInfo()
-                {
-                    IsSerial = true,
-                    Name = "Serial Shocker " + shockerId,
-                    ClientId = (int)terminalInfo.SelectToken("clientId")!,
-                    ShockerId = shockerId,
-                    IsPaused = shocker.SelectToken("paused")!.Value<bool>(),
-                };
-                return info;
-            }
-            /// <summary>
-            /// Get the basic information of the Shocker
-            /// </summary>
-            /// <returns> A <c>BasicShockerInfo</c> instance</returns>
-            public BasicShockerInfo Info()
-            {
-                return info;
-            }
+                IsSerial = true,
+                Name = "Serial Shocker " + shockerId,
+                ClientId = (int)terminalInfo.SelectToken("clientId")!,
+                ShockerId = shockerId,
+                IsPaused = shocker.SelectToken("paused")!.Value<bool>(),
+            };
+            return info;
+        }
+        /// <summary>
+        /// Get the basic information of the Shocker
+        /// </summary>
+        /// <returns> A <c>BasicShockerInfo</c> instance</returns>
+        public BasicShockerInfo Info()
+        {
+            return info;
         }
     }
 }

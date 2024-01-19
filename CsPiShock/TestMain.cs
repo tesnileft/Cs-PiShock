@@ -1,7 +1,6 @@
-﻿
-namespace CsPiShock
+﻿namespace CsPiShock
 {
-    internal class TestMain
+    class TestMain
     {
         /// <summary>
         /// Main function for debugging
