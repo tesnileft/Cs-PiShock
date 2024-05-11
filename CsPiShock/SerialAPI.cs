@@ -90,14 +90,16 @@
             Console.WriteLine("Connected to " + ComPort);
         }
 
+        public SerialShocker GetShocker(int shockerId)
+        {
+            SerialShocker serialShocker = new SerialShocker(shockerId, this);
+            return serialShocker;
+
+        }
 
         /// <summary>
         /// Sends an operation to the PiShock
         /// </summary>
-        /// <param name="shocker_id"> ID of the shocker </param>
-        /// <param name="operation"> <c>SerialOperation</c> representing the operation</param>
-        /// <param name="duration"> Duration in milliseconds </param>
-        /// <param name="intensity"> Range from 0 to 100 </param>
         private void SendCommand(PiCommand piCommand)
         {
             _command_queue.Enqueue(piCommand);
@@ -229,7 +231,9 @@
                 throw new NullReferenceException("This should never happen");
             }
         }
-
+        /// <summary>
+        /// Starts the thread that reads commands from the input queue and sends them to the PiShock
+        /// </summary>
         private void StartThread()
         {
             CancellationToken cancellationToken = _cancellationTokenSource.Token;
@@ -249,6 +253,7 @@
                 }
             }).Start();
         }
+
         /// <summary>
         /// Dispose of all resources used by the class (use this to properly close the ports/thread)
         /// </summary>
@@ -260,7 +265,7 @@
                 shocker.End();
                 Thread.Sleep(100); //Wait 100 ms to ensure every command is not executed too fast (and thus is actually picked up by the PiShock)
             }
-
+            
             //Close our port and thread
             _serialPort.Close();
             _cancellationTokenSource.Cancel();
@@ -307,18 +312,18 @@
         {
             return $"Serial shocker {info.ShockerId} ({api.ComPort})";
         }
-        public void Shock(int duration, int intensity)
+        public override void Shock(int duration, int intensity)
         {
             api.Operate(info.ShockerId, SerialOperation.SHOCK, duration, intensity);
         }
         /// <summary>
         /// 
         /// </summary>
-        public void Vibrate(int duration, int intensity)
+        public override void Vibrate(int duration, int intensity)
         {
             api.Operate(info.ShockerId, SerialOperation.VIBRATE, duration, intensity);
         }
-        public void Beep(int duration)
+        public override void Beep(int duration)
         {
             api.Operate(info.ShockerId, SerialOperation.BEEP, duration);
         }

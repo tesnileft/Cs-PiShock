@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 
 namespace CsPiShock
 {
-
     public abstract class ApiBase
     {
         ConcurrentQueue<PiCommand> _command_queue = new ConcurrentQueue<PiCommand>();
@@ -60,6 +59,7 @@ namespace CsPiShock
             /// </summary>
             /// <param name="shockerId"> ID of the shocker </param>
             /// <param name="operation"> Type of operation (Takes a value from <c>SerialOperation</c>)</param>
+            /// <param name="opDuration"></param>
             /// <param name="opIntensity"></param>
             public OperationValues(int shockerId, SerialOperation operation, int? opDuration = null, int? opIntensity = null)
             {
