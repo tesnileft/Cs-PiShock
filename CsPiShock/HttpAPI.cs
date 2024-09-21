@@ -1,6 +1,7 @@
 using System.IO.Ports;
 using Newtonsoft.Json;
 using System.Text;
+using Newtonsoft.Json.Linq;
 
 namespace CsPiShock
 {
@@ -22,21 +23,26 @@ namespace CsPiShock
             _httpClient = httpClient;
 
         }
-        private async Task <string> Request(PiCommand command) {
+        async Task <string> Request(PiCommand command) 
+        {
             StringContent jsonString = new (JsonConvert.SerializeObject(command), Encoding.UTF8, "application/json");
             var response =await _httpClient.PostAsync("", jsonString);
             return await response.Content.ReadAsStringAsync();
-            }
+        }
+        
 
     }
     public class HttpShocker : Shocker
     {
         PiShockHttpApi _api;
         BasicShockerInfo _basicShockerInfo;
-        HttpShocker(PiShockHttpApi api)
+        
+        HttpShocker(PiShockHttpApi api, string? name = "")
         {
             _api = api;
-            _basicShockerInfo = new BasicShockerInfo();
+            JObject basicShockerInfo = new JObject(); //Should request from the pishock server
+            
+            _basicShockerInfo = new BasicShockerInfo(basicShockerInfo);
         }
         public override string ToString()
         {
@@ -44,8 +50,7 @@ namespace CsPiShock
         }
         public override void Shock(int duration, int intensity)
         {
-
-            throw new System.NotImplementedException();
+            
         }
         public override void Vibrate(int duration, int intensity)
         {
@@ -53,6 +58,7 @@ namespace CsPiShock
         }
         public override void Beep(int duration)
         {
+            
         }
         public void End()
         {

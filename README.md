@@ -6,9 +6,8 @@ This is a C# adaptation of Zerario's [Python PiShock API](https://github.com/zer
 
 
 ## Features
-- Not a CLI because thats not what this is for.
 - Simple function names and all async operations offloaded to their own thread.
-- Serial API ( With currently support for auto-detecting the port on windows only)
+- Serial API ( With currently support for auto-detecting the port on windows and linux)
 - Documentation comments on every (public) function and hopefully an actual documentation in the future
 
 - To be added: Http API. (Which will be interchangable with the serial API)

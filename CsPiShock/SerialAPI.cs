@@ -60,14 +60,14 @@
         {
             if (providedPort == null)
             {
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) || RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
                 {
                     Console.WriteLine(ComPort);
-                    return GetComPortWin();
+                    return GetComPort();
                 }
                 else
                 {
-                    Debug.WriteLine("No port provided, defaulting to COM3");
+                    Debug.WriteLine("No port provided, defaulting to COM3, fuck you Mac users <3");
                     return "COM3";
                 }
             }
@@ -192,6 +192,20 @@
         {
             SendCommand("restart");
         }
+
+        private static string GetComPort()
+        {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            {
+                return GetComPortLin();
+            }
+            else if(RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                return GetComPortWin();
+            }
+
+            return "COM 3";
+        }
         /// <summary>
         /// Windows specific method of obtaining the COM port the PiShock is connected to
         /// </summary>
@@ -228,8 +242,23 @@
 
             else
             {
-                throw new NullReferenceException("This should never happen");
+                throw new NullReferenceException("The PiShock was found but it doesn't exist, this shouldn't happen");
             }
+        }
+
+        [SupportedOSPlatform("linux")]
+        private static string GetComPortLin()
+        {
+            
+            
+             
+             return "";
+        }
+        //Checks the device file in Linux for the vendor and device ID
+        bool PiShockCheckerLin(string portName)
+        {
+            LinuxDeviceManager.GetDeviceUsbPort(USB_IDS);
+            return true;
         }
         /// <summary>
         /// Starts the thread that reads commands from the input queue and sends them to the PiShock
