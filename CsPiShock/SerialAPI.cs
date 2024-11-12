@@ -146,6 +146,7 @@
                 }
                 count++;
             }
+            Dispose();
             throw new TimeoutException("Timed out waiting for info, make sure the given device is indeed a PiShock");
         }
 
@@ -249,10 +250,7 @@
         [SupportedOSPlatform("linux")]
         private static string GetComPortLin()
         {
-            
-            
-             
-             return "";
+            return LinuxDeviceManager.GetDeviceUsbPort(USB_IDS);
         }
         //Checks the device file in Linux for the vendor and device ID
         bool PiShockCheckerLin(string portName)
