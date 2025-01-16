@@ -135,6 +135,7 @@
             int count = 0;
             while (timeOut > count)
             {
+                Thread.Sleep(5);
                 string line = _serialPort.ReadLine();
 
                 if (debug)
