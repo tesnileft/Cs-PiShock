@@ -7,6 +7,9 @@
         /// </summary>
         static void Main()
         {
+
+            
+            
             PiShockSerialApi pishock = new PiShockSerialApi();
             //SerialShocker s = new SerialShocker(8619, pishock);
             //Console.WriteLine(pishock.Info()); //Print the info of the shocker
