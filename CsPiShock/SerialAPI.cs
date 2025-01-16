@@ -1,4 +1,6 @@
-﻿namespace CsPiShock
+﻿using System.Data;
+
+namespace CsPiShock
 {
     using System.Diagnostics;
     using System.Management;
@@ -33,7 +35,7 @@
         //Class variables
         public string? ComPort;
         SerialPort _serialPort = null!;
-        const int InfoTimeout = 20;
+        const int InfoTimeout = 60;
         ConcurrentQueue<PiCommand> _command_queue = new ConcurrentQueue<PiCommand>();
         CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
         List<SerialShocker> serialShockers = new List<SerialShocker>();
@@ -120,8 +122,17 @@
 
         public JObject Info(int timeOut = InfoTimeout, bool debug = false)
         {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            {
+                //We need to wake up the pishock, it is eepy :)
+                SendCommand("");
+                Thread.Sleep(10000);
+            }
             SendCommand("info");
+            
             return JObject.Parse(WaitInfo(timeOut, debug));
+            
+            
         }
         /// <summary>
         /// 
@@ -132,21 +143,29 @@
         /// <exception cref="TimeoutException"></exception>
         private string WaitInfo(int timeOut = InfoTimeout, bool debug = false)
         {
+            // while (_serialPort.BytesToRead > 0)
+            // {
+            //     Console.Write((char)_serialPort.ReadChar());
+            // }
+            
             int count = 0;
             while (timeOut > count)
             {
-                Thread.Sleep(5);
+                Thread.Sleep(100);
+                
                 string line = _serialPort.ReadLine();
-
+                
                 if (debug)
-                    Console.WriteLine(line);
+                    Console.WriteLine(line + "\n");
 
                 if (line.StartsWith(TERMINAL_INFO))
                 {
-                    return line[TERMINAL_INFO.Length..];
+                    Console.WriteLine("Got terminalinfo!!!!!!!!!???!");
+                    return line.Substring(TERMINAL_INFO.Length);
                 }
                 count++;
             }
+            
             Dispose();
             throw new TimeoutException("Timed out waiting for info, make sure the given device is indeed a PiShock");
         }
@@ -364,7 +383,7 @@
         }
         private BasicShockerInfo _Info(int shockerId)
         {
-            JObject terminalInfo = api.Info();
+            JObject terminalInfo = api.Info(20,true);
             JToken shocker = terminalInfo.SelectToken("shockers")!.First(x => (int)x.SelectToken("id")! == shockerId);
             if (shocker.SelectToken("id") == null | shocker.SelectToken("id")!.Value<int>() != shockerId)
             {
