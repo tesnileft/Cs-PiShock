@@ -1,4 +1,5 @@
 ﻿using System.Data;
+using ExtendedSerialPort_NS;
 
 namespace CsPiShock
 {
@@ -21,20 +22,23 @@ namespace CsPiShock
     public class PiShockSerialApi : ApiBase
     {
         //Possible VID and PID port values for the PiShock
-        static List<(int, int)> USB_IDS = new List<(int, int)>(){
-            (0x1A86, 0x7523),  //CH340, PiShock Next
-            (0x1A86, 0x55D4),  //CH9102, PiShock Lite
-         };
+        static List<(int, int)> USB_IDS = new List<(int, int)>()
+        {
+            (0x1A86, 0x7523), //CH340, PiShock Next
+            (0x1A86, 0x55D4), //CH9102, PiShock Lite
+        };
 
         enum DeviceType
         {
             NEXT = 4,
             LITE = 3
         }
+
         const string TERMINAL_INFO = "TERMINALINFO: ";
+
         //Class variables
         public string? ComPort;
-        SerialPort _serialPort = null!;
+        ExtendedSerialPort _serialPort = null!;
         const int InfoTimeout = 60;
         ConcurrentQueue<PiCommand> _command_queue = new ConcurrentQueue<PiCommand>();
         CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
@@ -47,10 +51,18 @@ namespace CsPiShock
         {
             _serialPort.DataReceived += (s, e) => Console.WriteLine("Data received: " + _serialPort.ReadLine());
         }
+
         public PiShockSerialApi(string? providedPort = null)
         {
-            ComPort = GetPort(providedPort);    //Get the com port
-            Connect();                          //Initialize the serial port
+            ComPort = GetPort(providedPort); //Get the com port
+            _serialPort = new ExtendedSerialPort(
+                ComPort!,
+                115200,
+                Parity.None
+            );
+            _serialPort.Open();
+            Console.WriteLine("Connected to " + ComPort);
+            
             StartThread();
         }
 
@@ -62,7 +74,8 @@ namespace CsPiShock
         {
             if (providedPort == null)
             {
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) || RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ||
+                    RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
                 {
                     Console.WriteLine(ComPort);
                     return GetComPort();
@@ -78,25 +91,11 @@ namespace CsPiShock
                 return providedPort;
             }
         }
-        /// <summary>
-        /// Initializes the connection to the PiShock over serial
-        /// </summary>
-        private void Connect()
-        {
-            _serialPort = new SerialPort
-            {
-                PortName = ComPort,
-                BaudRate = 115200
-            };
-            _serialPort.Open();
-            Console.WriteLine("Connected to " + ComPort);
-        }
 
-        public SerialShocker GetShocker(int shockerId)
+        public override SerialShocker CreateShocker(int shockerId)
         {
             SerialShocker serialShocker = new SerialShocker(shockerId, this);
             return serialShocker;
-
         }
 
         /// <summary>
@@ -106,6 +105,7 @@ namespace CsPiShock
         {
             _command_queue.Enqueue(piCommand);
         }
+
         private void SendCommand(string command)
         {
             PiCommand piCommand = new PiCommand
@@ -122,18 +122,13 @@ namespace CsPiShock
 
         public JObject Info(int timeOut = InfoTimeout, bool debug = false)
         {
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-            {
-                //We need to wake up the pishock, it is eepy :)
-                SendCommand("");
-                Thread.Sleep(10000);
-            }
             SendCommand("info");
-            
+
             return JObject.Parse(WaitInfo(timeOut, debug));
-            
-            
+
+
         }
+
         /// <summary>
         /// 
         /// </summary>
@@ -143,29 +138,24 @@ namespace CsPiShock
         /// <exception cref="TimeoutException"></exception>
         private string WaitInfo(int timeOut = InfoTimeout, bool debug = false)
         {
-            // while (_serialPort.BytesToRead > 0)
-            // {
-            //     Console.Write((char)_serialPort.ReadChar());
-            // }
-            
             int count = 0;
             while (timeOut > count)
             {
-                Thread.Sleep(100);
-                
-                string line = _serialPort.ReadLine();
-                
+                //Thread.Sleep(100);
+
+                string line = _serialPort.BaseStream.ReadAsync();
+
                 if (debug)
                     Console.WriteLine(line + "\n");
 
                 if (line.StartsWith(TERMINAL_INFO))
                 {
-                    Console.WriteLine("Got terminalinfo!!!!!!!!!???!");
                     return line.Substring(TERMINAL_INFO.Length);
                 }
+
                 count++;
             }
-            
+
             Dispose();
             throw new TimeoutException("Timed out waiting for info, make sure the given device is indeed a PiShock");
         }
@@ -196,6 +186,7 @@ namespace CsPiShock
             };
             SendCommand(networkCommand);
         }
+
         public void TryConnect(string ssid, string pass)
         {
             PiCommand networkCommand = new PiCommand
@@ -209,6 +200,7 @@ namespace CsPiShock
             };
             SendCommand(networkCommand);
         }
+
         public void Restart()
         {
             SendCommand("restart");
@@ -220,13 +212,14 @@ namespace CsPiShock
             {
                 return GetComPortLin();
             }
-            else if(RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
                 return GetComPortWin();
             }
 
             return "COM 3";
         }
+
         /// <summary>
         /// Windows specific method of obtaining the COM port the PiShock is connected to
         /// </summary>
@@ -257,7 +250,9 @@ namespace CsPiShock
                 Console.WriteLine("Found PiShock: " + PiShock["Caption"]);
                 string CUR_CTRL = "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\";
 
-                String PiShockPort = Registry.GetValue(CUR_CTRL + "Enum\\" + PiShock["PnpDeviceId"] + "\\Device Parameters", "PortName", "")!.ToString()!;
+                String PiShockPort =
+                    Registry.GetValue(CUR_CTRL + "Enum\\" + PiShock["PnpDeviceId"] + "\\Device Parameters", "PortName",
+                        "")!.ToString()!;
                 return PiShockPort;
             }
 
@@ -272,12 +267,14 @@ namespace CsPiShock
         {
             return LinuxDeviceManager.GetDeviceUsbPort(USB_IDS);
         }
+
         //Checks the device file in Linux for the vendor and device ID
         bool PiShockCheckerLin(string portName)
         {
             LinuxDeviceManager.GetDeviceUsbPort(USB_IDS);
             return true;
         }
+
         /// <summary>
         /// Starts the thread that reads commands from the input queue and sends them to the PiShock
         /// </summary>
@@ -293,6 +290,7 @@ namespace CsPiShock
                         string jsonString = BuildCommand(command);
                         _serialPort.WriteLine(jsonString);
                     }
+
                     if (cancellationToken.IsCancellationRequested)
                     {
                         break;
@@ -310,9 +308,10 @@ namespace CsPiShock
             foreach (SerialShocker shocker in serialShockers)
             {
                 shocker.End();
-                Thread.Sleep(100); //Wait 100 ms to ensure every command is not executed too fast (and thus is actually picked up by the PiShock)
+                Thread.Sleep(
+                    100); //Wait 100 ms to ensure every command is not executed too fast (and thus is actually picked up by the PiShock)
             }
-            
+
             //Close our port and thread
             _serialPort.Close();
             _cancellationTokenSource.Cancel();
@@ -324,7 +323,8 @@ namespace CsPiShock
             PiCommand cmd = new PiCommand("operate", values);
             SendCommand(cmd);
         }
-        /// <summary>
+
+    /// <summary>
         /// Help struct that is sent to the processing thread to then be sent to the pishock async from the main thread.
         /// </summary>
         private struct ShockerCommand
@@ -350,7 +350,7 @@ namespace CsPiShock
         private BasicShockerInfo info;
         private PiShockSerialApi api;
 
-        public SerialShocker(int shockerId, PiShockSerialApi api)
+        internal SerialShocker(int shockerId, PiShockSerialApi api)
         {
             this.api = api;
             this.info = _Info(shockerId);

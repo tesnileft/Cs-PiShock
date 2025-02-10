@@ -1,4 +1,6 @@
-﻿namespace CsPiShock
+﻿using CsPiShock;
+
+namespace TestMain
 {
     class TestMain
     {
@@ -7,14 +9,9 @@
         /// </summary>
         static void Main()
         {
-
-            
-            
             PiShockSerialApi pishock = new PiShockSerialApi();
-            //SerialShocker s = new SerialShocker(8619, pishock);
-            //Console.WriteLine(pishock.Info()); //Print the info of the shocker
-            SerialShocker shockerA = new SerialShocker(8619, pishock);
-            SerialShocker shockerB = new SerialShocker(9509, pishock);
+            SerialShocker shockerA = pishock.CreateShocker(8619);
+            SerialShocker shockerB = pishock.CreateShocker(9509);
 
             bool running = true;
             while (running)

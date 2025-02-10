@@ -33,6 +33,13 @@ namespace CsPiShock
         }
 
         /// <summary>
+        /// Returns a shocker of the appropriate type
+        /// </summary>
+        /// <returns></returns>
+        public abstract Shocker CreateShocker(int shockerId);
+        
+
+        /// <summary>
         /// Help struct to generate JSON strings to send to the pishock
         /// </summary>
         internal struct PiCommand

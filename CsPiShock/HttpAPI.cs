@@ -29,6 +29,11 @@ namespace CsPiShock
             var response =await _httpClient.PostAsync("", jsonString);
             return await response.Content.ReadAsStringAsync();
         }
+
+        public override HttpShocker CreateShocker(int shockerId)
+        {
+            return new HttpShocker(this, shockerId.ToString());
+        }
         
 
     }
@@ -37,7 +42,7 @@ namespace CsPiShock
         PiShockHttpApi _api;
         BasicShockerInfo _basicShockerInfo;
         
-        HttpShocker(PiShockHttpApi api, string? name = "")
+        internal HttpShocker(PiShockHttpApi api, string? name = "")
         {
             _api = api;
             JObject basicShockerInfo = new JObject(); //Should request from the pishock server
