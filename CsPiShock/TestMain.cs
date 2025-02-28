@@ -10,6 +10,7 @@ namespace TestMain
         static void Main()
         {
             PiShockSerialApi pishock = new PiShockSerialApi();
+            pishock.EnableDebug();
             SerialShocker shockerA = pishock.CreateShocker(8619);
             SerialShocker shockerB = pishock.CreateShocker(9509);
 
@@ -19,7 +20,7 @@ namespace TestMain
                 switch (Console.ReadLine())
                 {
                     case "Info":
-                        Console.WriteLine(pishock.Info());
+                        Console.WriteLine(pishock.Info);
                         break;
                     case "Stop":
                     case "stop":
@@ -36,6 +37,9 @@ namespace TestMain
                         shockerA.Vibrate(100, 20);
                         Thread.Sleep(100);
                         shockerB.Vibrate(100, 20);
+                        break;
+                    case "shocka":
+                        shockerA.Shock(100, 10);
                         break;
                 }
             }

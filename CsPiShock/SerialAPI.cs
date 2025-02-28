@@ -1,19 +1,20 @@
 ﻿using System.Data;
-using ExtendedSerialPort_NS;
+using System.Net.Mime;
+using System.Text;
+using SerialPortLib;
 
 namespace CsPiShock
 {
     using System.Diagnostics;
     using System.Management;
-    using System.IO.Ports;
-    using System.Reflection;
     using System.Runtime.InteropServices;
     using System.Runtime.Versioning;
     using System.Collections.Concurrent;
     using Newtonsoft.Json;
     using Microsoft.Win32;
     using Newtonsoft.Json.Linq;
-    using static CsPiShock.ApiBase;
+    
+    
 
 
     /// <summary>
@@ -38,32 +39,57 @@ namespace CsPiShock
 
         //Class variables
         public string? ComPort;
-        ExtendedSerialPort _serialPort = null!;
-        const int InfoTimeout = 60;
+        private SerialPortLib.SerialPortInput _serialPort;
+        const int InfoTimeout = 2000;
+        
+        public JObject Info { get; set; }
+        
         ConcurrentQueue<PiCommand> _command_queue = new ConcurrentQueue<PiCommand>();
         CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
         List<SerialShocker> serialShockers = new List<SerialShocker>();
+
+        private ManualResetEvent _infoUpdated = new(false);
 
         /// <summary>
         /// Mainly for debugging the development of this, you should probably run this on a seperate thread
         /// </summary>
         public void EnableDebug()
         {
-            _serialPort.DataReceived += (s, e) => Console.WriteLine("Data received: " + _serialPort.ReadLine());
+            
+        }
+        private void SerialPort_HandleMessage(object sender, MessageReceivedEventArgs e)
+        {
+            string piOutput = Encoding.Default.GetString(e.Data);
+            string[] splitOutput = piOutput.Split('\n');
+            try
+            {
+                string terminalInfo = splitOutput.First(x => x.StartsWith(TERMINAL_INFO));
+                if (terminalInfo != string.Empty)
+                {
+                    Info = (JObject)JsonConvert.DeserializeObject(terminalInfo.Substring(TERMINAL_INFO.Length,
+                        terminalInfo.Length - TERMINAL_INFO.Length));
+                    _infoUpdated.Set();
+                }
+            }
+            catch
+            {
+                
+            }
         }
 
         public PiShockSerialApi(string? providedPort = null)
         {
             ComPort = GetPort(providedPort); //Get the com port
-            _serialPort = new ExtendedSerialPort(
-                ComPort!,
-                115200,
-                Parity.None
-            );
-            _serialPort.Open();
-            Console.WriteLine("Connected to " + ComPort);
+            _serialPort = new SerialPortInput();
+            _serialPort.SetPort(ComPort, 115200);
+            _serialPort.Connect();
             
-            StartThread();
+            _serialPort.MessageReceived += SerialPort_HandleMessage;
+            Console.WriteLine("Connected to " + ComPort);
+            StartQueueThread();
+            UpdateInfo(500);
+            Console.WriteLine("Got PiShock Info");
+            
         }
 
         /// <summary>
@@ -120,44 +146,16 @@ namespace CsPiShock
             return JsonConvert.SerializeObject(piCommand);
         }
 
-        public JObject Info(int timeOut = InfoTimeout, bool debug = false)
+        public void UpdateInfo(int timeOut = InfoTimeout, bool debug = false)
         {
+            _infoUpdated.Reset();
             SendCommand("info");
-
-            return JObject.Parse(WaitInfo(timeOut, debug));
-
-
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="timeOut"></param>
-        /// <param name="debug"></param>
-        /// <returns>JSON string of the info</returns>
-        /// <exception cref="TimeoutException"></exception>
-        private string WaitInfo(int timeOut = InfoTimeout, bool debug = false)
-        {
-            int count = 0;
-            while (timeOut > count)
+            if (!_infoUpdated.WaitOne(timeOut))
             {
-                //Thread.Sleep(100);
-
-                string line = _serialPort.BaseStream.ReadAsync();
-
-                if (debug)
-                    Console.WriteLine(line + "\n");
-
-                if (line.StartsWith(TERMINAL_INFO))
-                {
-                    return line.Substring(TERMINAL_INFO.Length);
-                }
-
-                count++;
+                Console.WriteLine("Failed to update info, retrying...");
+                UpdateInfo(timeOut, debug);
             }
-
-            Dispose();
-            throw new TimeoutException("Timed out waiting for info, make sure the given device is indeed a PiShock");
+            //Info = JObject.Parse();
         }
 
         public void AddNetwork(string ssid, string pass)
@@ -278,7 +276,7 @@ namespace CsPiShock
         /// <summary>
         /// Starts the thread that reads commands from the input queue and sends them to the PiShock
         /// </summary>
-        private void StartThread()
+        private void StartQueueThread()
         {
             CancellationToken cancellationToken = _cancellationTokenSource.Token;
             new Thread(() =>
@@ -288,7 +286,8 @@ namespace CsPiShock
                     if (_command_queue.TryDequeue(out PiCommand command))
                     {
                         string jsonString = BuildCommand(command);
-                        _serialPort.WriteLine(jsonString);
+                        Console.WriteLine("Sending command: " + jsonString);
+                        _serialPort.SendMessage(Encoding.UTF8.GetBytes(jsonString));
                     }
 
                     if (cancellationToken.IsCancellationRequested)
@@ -313,7 +312,7 @@ namespace CsPiShock
             }
 
             //Close our port and thread
-            _serialPort.Close();
+            _serialPort.Disconnect();
             _cancellationTokenSource.Cancel();
         }
 
@@ -324,7 +323,7 @@ namespace CsPiShock
             SendCommand(cmd);
         }
 
-    /// <summary>
+        /// <summary>
         /// Help struct that is sent to the processing thread to then be sent to the pishock async from the main thread.
         /// </summary>
         private struct ShockerCommand
@@ -344,68 +343,5 @@ namespace CsPiShock
             }
         }
 
-    }
-    public class SerialShocker : Shocker
-    {
-        private BasicShockerInfo info;
-        private PiShockSerialApi api;
-
-        internal SerialShocker(int shockerId, PiShockSerialApi api)
-        {
-            this.api = api;
-            this.info = _Info(shockerId);
-        }
-        public override string ToString()
-        {
-            return $"Serial shocker {info.ShockerId} ({api.ComPort})";
-        }
-        public override void Shock(int duration, int intensity)
-        {
-            api.Operate(info.ShockerId, SerialOperation.SHOCK, duration, intensity);
-        }
-        /// <summary>
-        /// 
-        /// </summary>
-        public override void Vibrate(int duration, int intensity)
-        {
-            api.Operate(info.ShockerId, SerialOperation.VIBRATE, duration, intensity);
-        }
-        public override void Beep(int duration)
-        {
-            api.Operate(info.ShockerId, SerialOperation.BEEP, duration);
-        }
-        /// <summary>
-        /// End the currently running operation
-        /// </summary>
-        public void End()
-        {
-            api.Operate(info.ShockerId, SerialOperation.END);
-        }
-        private BasicShockerInfo _Info(int shockerId)
-        {
-            JObject terminalInfo = api.Info(20,true);
-            JToken shocker = terminalInfo.SelectToken("shockers")!.First(x => (int)x.SelectToken("id")! == shockerId);
-            if (shocker.SelectToken("id") == null | shocker.SelectToken("id")!.Value<int>() != shockerId)
-            {
-                throw new Exception("Shocker not found");
-            }
-            BasicShockerInfo info = new BasicShockerInfo()
-            {
-                IsSerial = true,
-                Name = "Serial Shocker " + shockerId,
-                ClientId = (int)terminalInfo.SelectToken("clientId")!,
-                ShockerId = shockerId,
-                IsPaused = shocker.SelectToken("paused")!.Value<bool>(),
-            };
-            return info;
-        }
-        /// <summary>
-        /// Get the basic information of the Shocker
-        /// </summary>
-        /// <returns> A <c>BasicShockerInfo</c> instance</returns>
-        public BasicShockerInfo Info()
-        {
-            return info;
-        }
     }
 }
