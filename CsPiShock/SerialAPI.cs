@@ -14,9 +14,6 @@ namespace CsPiShock
     using Microsoft.Win32;
     using Newtonsoft.Json.Linq;
     
-    
-
-
     /// <summary>
     /// Low level access to PiShock serial functionality
     /// </summary>
@@ -34,32 +31,24 @@ namespace CsPiShock
             NEXT = 4,
             LITE = 3
         }
-
         const string TERMINAL_INFO = "TERMINALINFO: ";
-
-        //Class variables
+        
         public string? ComPort;
         private SerialPortLib.SerialPortInput _serialPort;
-        const int InfoTimeout = 2000;
+        const int InfoTimeout = 1000;
         
         public JObject Info { get; set; }
+        public bool DebugEnabled { get; set; }
         
         ConcurrentQueue<PiCommand> _command_queue = new ConcurrentQueue<PiCommand>();
         CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
         List<SerialShocker> serialShockers = new List<SerialShocker>();
-
         private ManualResetEvent _infoUpdated = new(false);
-
-        /// <summary>
-        /// Mainly for debugging the development of this, you should probably run this on a seperate thread
-        /// </summary>
-        public void EnableDebug()
-        {
-            
-        }
+        
         private void SerialPort_HandleMessage(object sender, MessageReceivedEventArgs e)
         {
             string piOutput = Encoding.Default.GetString(e.Data);
+            Console.WriteLine(piOutput);
             string[] splitOutput = piOutput.Split('\n');
             try
             {
@@ -242,14 +231,14 @@ namespace CsPiShock
                 throw new Exception("No devices found");
             }
 
-            ManagementBaseObject PiShock = collection.Cast<ManagementBaseObject>().First();
-            if (PiShock != null)
+            ManagementBaseObject piShock = collection.Cast<ManagementBaseObject>().First();
+            if (piShock != null)
             {
-                Console.WriteLine("Found PiShock: " + PiShock["Caption"]);
+                Console.WriteLine("Found PiShock: " + piShock["Caption"]);
                 string CUR_CTRL = "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\";
 
                 String PiShockPort =
-                    Registry.GetValue(CUR_CTRL + "Enum\\" + PiShock["PnpDeviceId"] + "\\Device Parameters", "PortName",
+                    Registry.GetValue(CUR_CTRL + "Enum\\" + piShock["PnpDeviceId"] + "\\Device Parameters", "PortName",
                         "")!.ToString()!;
                 return PiShockPort;
             }
@@ -297,7 +286,14 @@ namespace CsPiShock
                 }
             }).Start();
         }
-
+        
+        public void Operate(int shockerId, SerialOperation operation, int? duration = null, int? intensity = null)
+        {
+            OperationValues values = new OperationValues(shockerId, operation, duration, intensity);
+            PiCommand cmd = new PiCommand("operate", values);
+            SendCommand(cmd);
+        }
+        
         /// <summary>
         /// Dispose of all resources used by the class (use this to properly close the ports/thread)
         /// </summary>
@@ -315,33 +311,5 @@ namespace CsPiShock
             _serialPort.Disconnect();
             _cancellationTokenSource.Cancel();
         }
-
-        public void Operate(int shockerId, SerialOperation operation, int? duration = null, int? intensity = null)
-        {
-            OperationValues values = new OperationValues(shockerId, operation, duration, intensity);
-            PiCommand cmd = new PiCommand("operate", values);
-            SendCommand(cmd);
-        }
-
-        /// <summary>
-        /// Help struct that is sent to the processing thread to then be sent to the pishock async from the main thread.
-        /// </summary>
-        private struct ShockerCommand
-        {
-            public string cmd { get; set; }
-            public int? id { get; set; }
-            public SerialOperation? op { get; set; }
-            public int? duration { get; set; }
-            public int? intensity { get; set; }
-            public ShockerCommand(string command, int? id = null, SerialOperation? op = null, int? duration = null, int? intensity = null)
-            {
-                cmd = command;
-                this.id = id;
-                this.op = op;
-                this.duration = duration;
-                this.intensity = intensity;
-            }
-        }
-
     }
 }
