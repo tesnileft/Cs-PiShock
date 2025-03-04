@@ -15,10 +15,10 @@ namespace TestMain
         static void HttpTest()
         {
             PiShockHttpApi http = new PiShockHttpApi("Tesni","6aaa08de-6151-4094-96eb-20a39d82cda8");
-            if (http.VerifyCredentials())
-            {
-                Console.WriteLine("Thumbs up emoji");
-            }
+            HttpShocker a = http.CreateShocker("2ABD4353099");
+            a.Beep(1000);
+            a.Vibrate(10, 100);
+            
         }
 
         static void SerialTest()
@@ -56,7 +56,7 @@ namespace TestMain
                             shockerA.Shock(100, 10);
                             break;
                         case "addnet":
-                            pishock.AddNetwork("The Other Side 2.4Ghz", "Boven_Bende");
+                            pishock.AddNetwork("TesPhone", "lollollol");
                             break;
                     }
                 }

@@ -62,7 +62,7 @@ public abstract class Shocker
         public int ShockerId { get; set; }
         public bool IsPaused { get; set; }
         public bool IsSerial { get; set; }
-        public BasicShockerInfo() //Dioverridey lol
+        public BasicShockerInfo() //Diy lol
         { }
         public BasicShockerInfo(JObject data, string? name = null)
         {

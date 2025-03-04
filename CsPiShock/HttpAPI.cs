@@ -93,6 +93,13 @@ namespace CsPiShock
             Request(command, "apioperate");
         }
 
+        internal string GetShockerInfo(string shockerCode)
+        {
+            HttpPiCommand command = GetCommand();
+            command.Code = shockerCode;
+            return Request(command, "GetShockerInfo").Content.ReadAsStringAsync().Result;
+        }
+
         public void TestBuzz()
         {
             HttpPiCommand command = new HttpPiCommand(_scriptName, _name, _apiKey)
@@ -131,7 +138,7 @@ namespace CsPiShock
             {
                 if (Duration != null)
                 {
-                    Duration = float.Clamp(Duration.Value, .1f, 1.5f);
+                    Duration = float.Clamp(Duration.Value, .1f, 15f);
                 }
                 if (Intensity != null)
                 {
@@ -143,10 +150,7 @@ namespace CsPiShock
     public class HttpShocker : Shocker
     {
         PiShockHttpApi _api;
-        BasicShockerInfo _basicShockerInfo;
         internal string _code;
-        
-        
         
         /// <summary>
         /// Makes a new HTTP shocker, needs an API
@@ -155,33 +159,36 @@ namespace CsPiShock
         /// <param name="shockerCode">Shocker code of the shocker you're controlling</param>
         internal  HttpShocker(PiShockHttpApi api, string shockerCode)
         {
-            JObject basicShockerInfo = new JObject(); //Should request from the pishock server
             _api = api;
             _code = shockerCode;
-            _basicShockerInfo = new BasicShockerInfo(basicShockerInfo);
         }
         public override string ToString()
         {
-            return $"{_basicShockerInfo.ToString}";
+            return $"{DetailedInfo().ToString}";
         }
-
+        
+        internal BasicShockerInfo DetailedInfo()
+        {
+            string a = _api.GetShockerInfo(_code);
+            var info = new BasicShockerInfo();
+            return info;
+        }
         
         internal void Call(PiShockHttpApi.Operation op, int duration = 100, int? intensity = 5)
         {
             _api.Operate(this._code, op, duration, intensity);
-            
         }
         public override void Shock(int duration, int intensity)
         {
-            
+            Call(PiShockHttpApi.Operation.Shock, duration, intensity);
         }
         public override void Vibrate(int duration, int intensity)
         {
-
+            Call(PiShockHttpApi.Operation.Vibrate, duration, intensity);
         }
         public override void Beep(int duration)
         {
-            
+            Call(PiShockHttpApi.Operation.Beep, duration);
         }
         
     }
