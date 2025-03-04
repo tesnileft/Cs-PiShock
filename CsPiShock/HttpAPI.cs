@@ -25,10 +25,10 @@ namespace CsPiShock
         }
 
         /// <summary>
-        /// 
+        /// Makes the HTTP api object that can be used to send requests to the PiChock servers with proper authentication.
         /// </summary>
         /// <param name="name">The Username for the request</param>
-        /// <param name="apiKey">The api key acquired from the pishock website</param>
+        /// <param name="apiKey">The api key acquired from the pishock website. Should be your own, not the one of whichever share code you received</param>
         /// <param name="scriptName">Optional custom name for the API, shows up in the feed on the website</param>
         public PiShockHttpApi(string name, string apiKey, string scriptName = DefaultName)
         {
@@ -69,23 +69,33 @@ namespace CsPiShock
             return true;
         }
 
-        public override HttpShocker CreateShocker(int shockerId)
+        public override HttpShocker CreateShocker(string shockerId)
         {
-            return new HttpShocker(this, shockerId.ToString());
+            return new HttpShocker(this, shockerId);
         }
 
         internal HttpPiCommand GetCommand()
         {
-            HttpPiCommand command = new HttpPiCommand(_scriptName,_name)
-            {
-                ApiKey = _apiKey
-            };
+            HttpPiCommand command = new HttpPiCommand(_scriptName, _name, _apiKey);
             return command;
+        }
+        internal void Operate(string code, Operation operation, int? duration, int? intensity)
+        {
+            var command = GetCommand();
+            if (duration.HasValue)
+            {
+                command.Duration = (float)duration/100; //Go from ms to seconds
+            }
+            command.Intensity = intensity;
+            command.Op = (int)operation;
+            command.Code = code;
+            command.Clamp();
+            Request(command, "apioperate");
         }
 
         public void TestBuzz()
         {
-            HttpPiCommand command = new HttpPiCommand(_scriptName, _name)
+            HttpPiCommand command = new HttpPiCommand(_scriptName, _name, _apiKey)
             {
                 Code = "2ABD4353099",
                 Duration = 1,
@@ -94,63 +104,60 @@ namespace CsPiShock
             };
             command.Clamp();
             Request(command, "apioperate");
-            
-        }
-
-        static HttpPiCommand ClampCommandValues(HttpPiCommand command)
-        {
-            
-            return command;
         }
         
         internal class HttpPiCommand
         {
             public string Username { get; set; }
-            public string? ApiKey { get; set; }
+            public string ApiKey { get; set; }
             public string? Code { get; set; }
             public string Name { get; set; }
             public int Op { get; set; }
-            public float Duration { get; set; }
-            public int Intensity { get; set; }
+            public float? Duration { get; set; }
+            public int? Intensity { get; set; }
             
-            internal HttpPiCommand(string name, string user)
+            internal HttpPiCommand(string name, string user, string apiKey)
             {
                 Name = name;
                 Username = user;
+                ApiKey = apiKey;
             }
 
+            
+            /// <summary>
+            /// Clamps duration and intensity to be compliant with the api
+            /// </summary>
             public void Clamp()
             {
-                Duration = float.Clamp(Duration, .1f, 1.5f);
-                Intensity = int.Clamp(Intensity, 1, 100);
+                if (Duration != null)
+                {
+                    Duration = float.Clamp(Duration.Value, .1f, 1.5f);
+                }
+                if (Intensity != null)
+                {
+                    Intensity = int.Clamp(Intensity.Value, 1, 100);
+                }
             }
-            
-            
-            
         }
-        
-
     }
     public class HttpShocker : Shocker
     {
-        PiShockHttpApi? _api;
+        PiShockHttpApi _api;
         BasicShockerInfo _basicShockerInfo;
-        internal string? _code;
-        internal string _user = "Placeholder username";
-        internal string Name = "ScriptName";
+        internal string _code;
         
         
         
         /// <summary>
-        /// Makes a new HTTP shocker, with the API object
+        /// Makes a new HTTP shocker, needs an API
         /// </summary>
         /// <param name="api"></param>
-        /// <param name="name"></param>
-        internal HttpShocker(PiShockHttpApi api, string? name = "Shocker")
+        /// <param name="shockerCode">Shocker code of the shocker you're controlling</param>
+        internal  HttpShocker(PiShockHttpApi api, string shockerCode)
         {
-            _api = api;
             JObject basicShockerInfo = new JObject(); //Should request from the pishock server
-            
+            _api = api;
+            _code = shockerCode;
             _basicShockerInfo = new BasicShockerInfo(basicShockerInfo);
         }
         public override string ToString()
@@ -159,13 +166,9 @@ namespace CsPiShock
         }
 
         
-        internal void Call(PiShockHttpApi.Operation op, float duration = 0.1f, int? intensity = 5)
+        internal void Call(PiShockHttpApi.Operation op, int duration = 100, int? intensity = 5)
         {
-            PiShockHttpApi.HttpPiCommand command = new PiShockHttpApi.HttpPiCommand(Name, _user)
-            {
-                Op = (int)op,
-                
-            };
+            _api.Operate(this._code, op, duration, intensity);
             
         }
         public override void Shock(int duration, int intensity)
@@ -180,6 +183,11 @@ namespace CsPiShock
         {
             
         }
+        
+    }
+
+    internal static class Extensions
+    {
         
     }
 

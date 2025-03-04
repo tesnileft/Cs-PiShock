@@ -107,9 +107,9 @@ namespace CsPiShock
             }
         }
 
-        public override SerialShocker CreateShocker(int shockerId)
+        public override SerialShocker CreateShocker(string shockerId)
         {
-            SerialShocker serialShocker = new SerialShocker(shockerId, this);
+            SerialShocker serialShocker = new SerialShocker(int.Parse(shockerId), this);
             return serialShocker;
         }
 

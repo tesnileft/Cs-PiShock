@@ -44,7 +44,6 @@ public abstract class Shocker
     /// <exception cref="NotImplementedException"></exception>
     BasicShockerInfo Info()
     {
-
         throw new NotImplementedException();
     }
 
@@ -63,7 +62,7 @@ public abstract class Shocker
         public int ShockerId { get; set; }
         public bool IsPaused { get; set; }
         public bool IsSerial { get; set; }
-        public BasicShockerInfo() //Diy lol
+        public BasicShockerInfo() //Dioverridey lol
         { }
         public BasicShockerInfo(JObject data, string? name = null)
         {

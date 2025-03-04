@@ -25,8 +25,8 @@ namespace TestMain
         {
                 PiShockSerialApi pishock = new PiShockSerialApi();
                 pishock.DebugEnabled = true;
-                SerialShocker shockerA = pishock.CreateShocker(8619);
-                SerialShocker shockerB = pishock.CreateShocker(9509);
+                SerialShocker shockerA = pishock.CreateShocker("8619");
+                SerialShocker shockerB = pishock.CreateShocker("9509");
 
                 bool running = true;
                 while (running)

@@ -36,7 +36,7 @@ namespace CsPiShock
         /// Returns a shocker of the appropriate type
         /// </summary>
         /// <returns></returns>
-        public abstract Shocker CreateShocker(int shockerId);
+        public abstract Shocker CreateShocker(string shockerId);
         
 
         /// <summary>
