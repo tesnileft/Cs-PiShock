@@ -4,22 +4,26 @@ namespace TestMain
 {
     class TestMain
     {
+        private static string _user = "Tesni";
+        private static string _apiKey = "a72962a9-05b8-4e81-bd62-8a02f31f4125";
         /// <summary>
         /// Main function for debugging
         /// </summary>
         static void Main(string[] args)
         {
-            SerialTest();
+            SocketTest();
         }
 
-        static void HttpTest()
+        static void SocketTest()
         {
-            PiShockHttpApi http = new PiShockHttpApi("Tesni","6aaa08de-6151-4094-96eb-20a39d82cda8");
-            HttpShocker a = http.CreateShocker("2ABD4353099");
-            a.Beep(1000);
-            a.Vibrate(10, 100);
-            
+            var socket = new WebSocketAPI(_apiKey, _user );
+            Console.WriteLine("Ping...");
+            if (socket.Ping().Result)
+            {
+                Console.WriteLine("Pong!");
+            }
         }
+    
 
         static void SerialTest()
         {

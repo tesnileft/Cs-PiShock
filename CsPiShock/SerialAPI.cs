@@ -20,7 +20,7 @@ namespace CsPiShock
     public class PiShockSerialApi : ApiBase
     {
         //Possible VID and PID port values for the PiShock
-        static List<(int, int)> USB_IDS = new List<(int, int)>()
+        static List<(int, int)> _usbIds = new List<(int, int)>()
         {
             (0x1A86, 0x7523), //CH340, PiShock Next
             (0x1A86, 0x55D4), //CH9102, PiShock Lite
@@ -28,10 +28,10 @@ namespace CsPiShock
 
         enum DeviceType
         {
-            NEXT = 4,
-            LITE = 3
+            Next = 4,
+            Lite = 3
         }
-        const string TERMINAL_INFO = "TERMINALINFO: ";
+        static string _terminalInfo = "TERMINALINFO: ";
         
         public string? ComPort;
         private SerialPortLib.SerialPortInput _serialPort;
@@ -40,9 +40,9 @@ namespace CsPiShock
         public JObject Info { get; set; }
         public bool DebugEnabled { get; set; }
         
-        ConcurrentQueue<PiCommand> _command_queue = new ConcurrentQueue<PiCommand>();
+        ConcurrentQueue<PiCommand> _commandQueue = new ConcurrentQueue<PiCommand>();
         CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
-        List<SerialShocker> serialShockers = new List<SerialShocker>();
+        List<SerialShocker> _serialShockers = new List<SerialShocker>();
         private ManualResetEvent _infoUpdated = new(false);
         
         private void SerialPort_HandleMessage(object sender, MessageReceivedEventArgs e)
@@ -52,11 +52,11 @@ namespace CsPiShock
             string[] splitOutput = piOutput.Split('\n');
             try
             {
-                string terminalInfo = splitOutput.First(x => x.StartsWith(TERMINAL_INFO));
+                string terminalInfo = splitOutput.First(x => x.StartsWith(_terminalInfo));
                 if (terminalInfo != string.Empty)
                 {
-                    Info = (JObject)JsonConvert.DeserializeObject(terminalInfo.Substring(TERMINAL_INFO.Length,
-                        terminalInfo.Length - TERMINAL_INFO.Length));
+                    Info = JObject.Parse(terminalInfo.Substring(_terminalInfo.Length,
+                        terminalInfo.Length - _terminalInfo.Length));
                     _infoUpdated.Set();
                 }
             }
@@ -118,7 +118,7 @@ namespace CsPiShock
         /// </summary>
         private void SendCommand(PiCommand piCommand)
         {
-            _command_queue.Enqueue(piCommand);
+            _commandQueue.Enqueue(piCommand);
         }
 
         private void SendCommand(string command)
@@ -127,7 +127,7 @@ namespace CsPiShock
             {
                 cmd = command
             };
-            _command_queue.Enqueue(piCommand);
+            _commandQueue.Enqueue(piCommand);
         }
 
         private string BuildCommand(PiCommand piCommand)
@@ -217,7 +217,7 @@ namespace CsPiShock
         private static string GetComPortWin()
         {
             using var searcher = new ManagementObjectSearcher(
-                $"Select * From Win32_PnPEntity where PNPDeviceID Like '%{Convert.ToString(USB_IDS[0].Item1, 16)}%' AND (PNPDeviceID Like '%{Convert.ToString(USB_IDS[0].Item2, 16)}%' OR PNPDeviceID Like '%{Convert.ToString(USB_IDS[1].Item2, 16)}%')");
+                $"Select * From Win32_PnPEntity where PNPDeviceID Like '%{Convert.ToString(_usbIds[0].Item1, 16)}%' AND (PNPDeviceID Like '%{Convert.ToString(_usbIds[0].Item2, 16)}%' OR PNPDeviceID Like '%{Convert.ToString(_usbIds[1].Item2, 16)}%')");
 
             using ManagementObjectCollection collection = searcher.Get();
             //Console.WriteLine("Found " + collection.Count + " devices");
@@ -235,12 +235,12 @@ namespace CsPiShock
             if (piShock != null)
             {
                 Console.WriteLine("Found PiShock: " + piShock["Caption"]);
-                string CUR_CTRL = "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\";
+                string curCtrl = "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\";
 
-                String PiShockPort =
-                    Registry.GetValue(CUR_CTRL + "Enum\\" + piShock["PnpDeviceId"] + "\\Device Parameters", "PortName",
+                String piShockPort =
+                    Registry.GetValue(curCtrl + "Enum\\" + piShock["PnpDeviceId"] + "\\Device Parameters", "PortName",
                         "")!.ToString()!;
-                return PiShockPort;
+                return piShockPort;
             }
 
             else
@@ -252,13 +252,13 @@ namespace CsPiShock
         [SupportedOSPlatform("linux")]
         private static string GetComPortLin()
         {
-            return LinuxDeviceManager.GetDeviceUsbPort(USB_IDS);
+            return LinuxDeviceManager.GetDeviceUsbPort(_usbIds);
         }
 
         //Checks the device file in Linux for the vendor and device ID
         bool PiShockCheckerLin(string portName)
         {
-            LinuxDeviceManager.GetDeviceUsbPort(USB_IDS);
+            LinuxDeviceManager.GetDeviceUsbPort(_usbIds);
             return true;
         }
 
@@ -272,7 +272,7 @@ namespace CsPiShock
             {
                 while (true)
                 {
-                    if (_command_queue.TryDequeue(out PiCommand command))
+                    if (_commandQueue.TryDequeue(out PiCommand command))
                     {
                         string jsonString = BuildCommand(command);
                         Console.WriteLine("Sending command: " + jsonString);
@@ -300,7 +300,7 @@ namespace CsPiShock
         public void Dispose()
         {
             //We probably want to set all the shockers to be off by this point
-            foreach (SerialShocker shocker in serialShockers)
+            foreach (SerialShocker shocker in _serialShockers)
             {
                 shocker.End();
                 Thread.Sleep(
