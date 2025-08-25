@@ -4,6 +4,7 @@ using System.Text;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using NLog.Targets;
+// ReSharper disable InconsistentNaming
 
 namespace CsPiShock;
 
@@ -14,14 +15,20 @@ public class WebSocketAPI : ApiBase
     private string _userName;
     internal bool enableWarning = false;
     private ClientWebSocket _webSocket;
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="apiKey"> API key obtained from the pishock website</param>
+    /// <param name="username"> The username associated with the API key</param>
+    /// <exception cref="UserCredentialException"> If unable to get a proper response from the API with the provided credentials</exception>
     public WebSocketAPI(string apiKey, string username)
     {
         _userName = username;
         _apiKey = apiKey;
         string userIdRequest =
             $"https://auth.pishock.com/Auth/GetUserIfAPIKeyValid?apikey={apiKey}&username={username}";
-        var client = new HttpClient();
-        var result = client.GetAsync(userIdRequest).Result;
+        HttpClient client = new HttpClient();
+        HttpResponseMessage result = client.GetAsync(userIdRequest).Result;
         JObject jsonResponse = JObject.Parse(result.Content.ReadAsStringAsync().Result);
         string? userId = jsonResponse.Property("UserId")?.ToString();
         if (!string.IsNullOrEmpty(userId))
@@ -30,7 +37,7 @@ public class WebSocketAPI : ApiBase
         }
         else
         {
-            throw new Exception("Could not verify credentials");
+            throw new UserCredentialException("Could not verify credentials");
         }
         Console.WriteLine("Verified Credentials:");
         Console.WriteLine(userId);
@@ -69,6 +76,10 @@ public class WebSocketAPI : ApiBase
         return false;
     }
 
+    enum SocketCommandEnum
+    {
+        
+    }
     class SocketCommand
     {
         public string Operation { get; set; }
@@ -141,7 +152,7 @@ class CommandBody
     }
 }
 
-class Source
+struct Source
 {
     public string u { get; set; }  // User ID from first step
     public string ty { get; set; } // 'sc' for ShareCode, 'api' for Normal
