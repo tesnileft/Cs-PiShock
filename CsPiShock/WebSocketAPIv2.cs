@@ -88,6 +88,7 @@ public class WebSocketAPIv2 : ApiBase
         await Operate(new SubscribeOperation(targets));
         return true;
     }
+
     /// <summary>
     /// Method to subscribe to unsubscribe of shockers, for logging or pings.
     /// Requires specific strings as input.
@@ -97,14 +98,14 @@ public class WebSocketAPIv2 : ApiBase
     /// <returns></returns>
     public async Task<bool> Unsubscribe(string[] targets)
     {
-
-        await Operate(new SubscribeOperation(targets, true));
+        var result = await Operate(new SubscribeOperation(targets, true));
         return true;
     }
 
-    public async Task<bool> Publish()
+    internal async Task<bool> Publish(PublishCommand[] commands)
     {
-        await Operate(new PublishOperation())
+        await Operate(new PublishOperation(commands));
+        return true;
     }
     
     struct WebsocketRespone
@@ -117,7 +118,7 @@ public class WebSocketAPIv2 : ApiBase
     //Base Socket command
     record SocketOperation
     {
-        public string Operation { get; set; }
+        public string Operation { get; set; } 
         internal SocketOperation(string command)
         {
             Operation = command;
@@ -140,8 +141,8 @@ public class WebSocketAPIv2 : ApiBase
 
     record PublishOperation : SocketOperation
     {
-        CommandBody[] PublishCommands { get; set; }
-        internal PublishOperation(CommandBody[] commands) : base("PUBLISH")
+        PublishCommand[] PublishCommands { get; set; }
+        internal PublishOperation(PublishCommand[] commands) : base("PUBLISH")
         {
             PublishCommands = commands;
         }
@@ -173,10 +174,10 @@ public class WebSocketAPIv2 : ApiBase
     }
 }
 
-struct Command
+struct PublishCommand
 {
-    string Target;
-    CommandBody Body;
+    string Target; //for example c{clientId}-ops or c{clientId}-sops-{sharecode}
+    CommandBody Body; //Main body of the command
 }
 struct CommandBody
 {
