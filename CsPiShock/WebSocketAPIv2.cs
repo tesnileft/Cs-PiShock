@@ -8,7 +8,7 @@ using NLog.Targets;
 
 namespace CsPiShock;
 
-public class WebSocketAPI : ApiBase
+public class WebSocketAPIv2 : ApiBase
 {
     private string _apiKey;
     private string _userId;
@@ -21,7 +21,7 @@ public class WebSocketAPI : ApiBase
     /// <param name="apiKey"> API key obtained from the pishock website</param>
     /// <param name="username"> The username associated with the API key</param>
     /// <exception cref="UserCredentialException"> If unable to get a proper response from the API with the provided credentials</exception>
-    public WebSocketAPI(string apiKey, string username)
+    public WebSocketAPIv2(string apiKey, string username)
     {
         _userName = username;
         _apiKey = apiKey;
@@ -51,7 +51,7 @@ public class WebSocketAPI : ApiBase
     }
     
 
-    Task<WebSocketReceiveResult> Operate(SocketCommand cmd)
+    Task<WebSocketReceiveResult> Operate(SocketOperation cmd)
     {
         var message = JsonConvert.SerializeObject(cmd);
         //Console.WriteLine($"Sending message:\n{message}");
@@ -64,7 +64,7 @@ public class WebSocketAPI : ApiBase
     {
         try
         {
-            if (Operate(new SubscribeCommand("PING")).Result.GetType() == typeof(WebSocketReceiveResult))
+            if ((await Operate(new SocketOperation("PING"))).GetType() == typeof(WebSocketReceiveResult))
             {
                 return true;
             }
@@ -75,44 +75,79 @@ public class WebSocketAPI : ApiBase
         }
         return false;
     }
-
-    enum SocketCommandEnum
+    
+    /// <summary>
+    /// Method to subscribe to events of shockers, for logging or pings.
+    /// Requires specific strings as input.
+    /// Preferably use the subscribe method of the specific shocker you are wanting to subscribe to.
+    /// </summary>
+    /// <param name="targets">Formatted as {client-id}-log or {client-id}-ping</param>
+    /// <returns></returns>
+    public async Task<bool> Subscribe(string[] targets)
     {
-        
+        await Operate(new SubscribeOperation(targets));
+        return true;
     }
-    class SocketCommand
+    /// <summary>
+    /// Method to subscribe to unsubscribe of shockers, for logging or pings.
+    /// Requires specific strings as input.
+    /// Preferably use the unsubscribe method of the specific shocker you are wanting to unsubscribe from.
+    /// </summary>
+    /// <param name="targets">Formatted as {client-id}-log or {client-id}-ping</param>
+    /// <returns></returns>
+    public async Task<bool> Unsubscribe(string[] targets)
+    {
+
+        await Operate(new SubscribeOperation(targets, true));
+        return true;
+    }
+
+    public async Task<bool> Publish()
+    {
+        await Operate(new PublishOperation())
+    }
+    
+    struct WebsocketRespone
+    {
+        public string ErrorCode;
+        public string IsError;
+        public string Message;
+        public string OriginalCommand;
+    }
+    //Base Socket command
+    record SocketOperation
     {
         public string Operation { get; set; }
-
-        protected SocketCommand(string command)
+        internal SocketOperation(string command)
         {
             Operation = command;
         }
     }
-
-    class SubscribeCommand : SocketCommand
+    
+    /// <summary>
+    /// Command for sub- or unsubscribing to/from pings and logs
+    /// </summary>
+    /// <param name="targets"></param>
+    /// <param name="unsub"></param>
+    record SubscribeOperation : SocketOperation
     {
         public string[]? Targets { get; set; }
-
-        internal SubscribeCommand(string command) : base(command)
+        internal SubscribeOperation(string[] targets, bool unsub = false) : base(unsub ? "SUBSCRIBE" : "UNSUBSCRIBE")
         {
-            
+            Targets = targets;
         }
     }
 
-    class PublishCommand : SocketCommand
+    record PublishOperation : SocketOperation
     {
-        
-        internal PublishCommand(CommandBody[] commands) :base("PUBLISH")
+        CommandBody[] PublishCommands { get; set; }
+        internal PublishOperation(CommandBody[] commands) : base("PUBLISH")
         {
             PublishCommands = commands;
         }
-        CommandBody[] PublishCommands { get; set; }
-        
     }
 
     /// <summary>
-    /// This is a bit weird, but because of the hierarchy of the Json required for the API it just works
     /// </summary>
     /// <returns></returns>
     internal Source GetSource()
@@ -120,20 +155,30 @@ public class WebSocketAPI : ApiBase
         return new Source()
         {
             u = _userId,
-            ty = "api", //Since we're just using the API key, I'm not dealing with opening a window rn.
+            ty = "api", // 'sc' for share code, 'api' for api key
             w = enableWarning,
             h = false,
             o = _userName
         };
     }
 
+    /// <summary>
+    /// Creates a shocker registered to this api key/share key/user login info
+    /// </summary>
+    /// <param name="shockerId">ID of the shocker, found in the website/obtainable with internal tools</param>
+    /// <returns>A new instance of a shocker with the given ID</returns>
     public override SocketShocker CreateShocker(string shockerId)
     {
         throw new System.NotImplementedException();
     }
-    
 }
-class CommandBody
+
+struct Command
+{
+    string Target;
+    CommandBody Body;
+}
+struct CommandBody
 {
     public int id { get; set; }     //Shocker ID
     public char m { get; set; }        // 'v', 's', 'b', or 'e'
@@ -151,7 +196,9 @@ class CommandBody
         l = source;
     }
 }
-
+/// <summary>
+/// Struct for sub-information for the command body
+/// </summary>
 struct Source
 {
     public string u { get; set; }  // User ID from first step
@@ -163,9 +210,9 @@ struct Source
 
 public class SocketShocker : Shocker
 {
-    private WebSocketAPI _api;
+    private WebSocketAPIv2 _api;
     BasicShockerInfo _info;
-    internal SocketShocker(WebSocketAPI api,int id, string name)
+    internal SocketShocker(WebSocketAPIv2 api,int id, string name)
     {
         _api = api;
         _info = new BasicShockerInfo()
@@ -177,13 +224,14 @@ public class SocketShocker : Shocker
         };
     }
 
+    //TODO
     internal void Call(char mode, int duration, int? intensity)
     {
-        new CommandBody(_info.ShockerId, mode, duration, intensity, _api.GetSource());
+        throw new System.NotImplementedException();
     }
     public override void Shock(int duration, int intensity)
     {
-        Call('s', duration, intensity);
+        throw new System.NotImplementedException();
     }
 
     public override void Vibrate(int duration, int intensity)

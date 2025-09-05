@@ -248,18 +248,11 @@ namespace CsPiShock
                 throw new NullReferenceException("The PiShock was found but it doesn't exist, this shouldn't happen");
             }
         }
-
+        //Checks the device file in Linux for the vendor and device ID
         [SupportedOSPlatform("linux")]
         private static string GetComPortLin()
         {
-            return LinuxDeviceManager.GetDeviceUsbPort(_usbIds);
-        }
-
-        //Checks the device file in Linux for the vendor and device ID
-        bool PiShockCheckerLin(string portName)
-        {
-            LinuxDeviceManager.GetDeviceUsbPort(_usbIds);
-            return true;
+            return LinuxDeviceGetter.GetDeviceUsbPort(_usbIds);
         }
 
         /// <summary>

@@ -3,7 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 
-public static class LinuxDeviceManager
+public static class LinuxDeviceGetter
 {
     public struct DeviceInfo
     {
@@ -38,7 +38,6 @@ public static class LinuxDeviceManager
             
             foreach (var id in usb_ids)
             {
-                
                 //For each USB device, check if device ID's match
                 int idP = Convert.ToInt32("0x" + idProd.Trim(), 16);
                 int idV = Convert.ToInt32("0x" + idVend.Trim(), 16);
