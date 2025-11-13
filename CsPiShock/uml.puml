@@ -1,0 +1,32 @@
+@startuml
+abstract ApiBase
+{
+    CreateShocker (int)
+}
+
+class SerialAPI implements ApiBase
+{
+
+}
+
+class WebSocketAPIv2 implements ApiBase
+{
+    
+}
+
+abstract Shocker
+{
+ + Shock 
+ + Beep
+ + Vibrate
+ + Stop()
+ 
+ + ToString() : string
+}
+class SerialShocker implements Shocker
+
+class SocketShocker implements Shocker
+
+SerialShocker <--> SerialAPI
+SocketShocker <--> WebSocketAPIv2
+@enduml
