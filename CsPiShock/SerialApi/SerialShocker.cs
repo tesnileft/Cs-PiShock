@@ -31,24 +31,24 @@ public class SerialShocker : Shocker
         }
         public override void Shock(int duration, int intensity)
         {
-            api.Operate(info.ShockerId, ApiBase.SerialOperation.SHOCK, duration, intensity);
+            api.Operate(info.ShockerId, Api.SerialOperation.SHOCK, duration, intensity);
         }
         /// <summary>
         /// 
         /// </summary>
         public override void Vibrate(int duration, int intensity)
         {
-            api.Operate(info.ShockerId, ApiBase.SerialOperation.VIBRATE, duration, intensity);
+            api.Operate(info.ShockerId, Api.SerialOperation.VIBRATE, duration, intensity);
         }
         public override void Beep(int duration)
         {
-            api.Operate(info.ShockerId, ApiBase.SerialOperation.BEEP, duration);
+            api.Operate(info.ShockerId, Api.SerialOperation.BEEP, duration);
         }
         /// <summary>
         /// End the currently running operation
         /// </summary>
         public void End()
         {
-            api.Operate(info.ShockerId, ApiBase.SerialOperation.END);
+            api.Operate(info.ShockerId, Api.SerialOperation.END);
         }
     }

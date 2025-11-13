@@ -8,7 +8,7 @@ using NLog.Targets;
 
 namespace CsPiShock;
 
-public class WebSocketAPIv2 : ApiBase
+public class WebSocketAPIv2 : Api
 {
     private string _apiKey;
     private string _userId;
@@ -102,9 +102,11 @@ public class WebSocketAPIv2 : ApiBase
         return true;
     }
 
+    //TODO
     public async Task<bool> Publish()
     {
-        await Operate(new PublishOperation())
+        await Operate(new PublishOperation([]));
+        return true;
     }
     
     struct WebsocketRespone
@@ -208,40 +210,3 @@ struct Source
     public string o { get; set; }  //Set the name shown in the logs
 }
 
-public class SocketShocker : Shocker
-{
-    private WebSocketAPIv2 _api;
-    BasicShockerInfo _info;
-    internal SocketShocker(WebSocketAPIv2 api,int id, string name)
-    {
-        _api = api;
-        _info = new BasicShockerInfo()
-        {
-            IsSerial = false,
-            IsPaused = false,
-            Name = name,
-            ShockerId = id
-        };
-    }
-
-    //TODO
-    internal void Call(char mode, int duration, int? intensity)
-    {
-        throw new System.NotImplementedException();
-    }
-    public override void Shock(int duration, int intensity)
-    {
-        throw new System.NotImplementedException();
-    }
-
-    public override void Vibrate(int duration, int intensity)
-    {
-        throw new System.NotImplementedException();
-    }
-
-    public override void Beep(int duration)
-    {
-        
-        throw new System.NotImplementedException();
-    }
-}

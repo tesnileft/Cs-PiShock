@@ -17,14 +17,9 @@ namespace CsPiShock
     /// <summary>
     /// Low level access to PiShock serial functionality
     /// </summary>
-    public class PiShockSerialApi : ApiBase
+    public class PiShockSerialApi : Api
     {
-        //Possible VID and PID port values for the PiShock
-        static List<(int, int)> _usbIds = new List<(int, int)>()
-        {
-            (0x1A86, 0x7523), //CH340, PiShock Next
-            (0x1A86, 0x55D4), //CH9102, PiShock Lite
-        };
+        
 
         enum DeviceType
         {
@@ -93,7 +88,7 @@ namespace CsPiShock
                     RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
                 {
                     Console.WriteLine(ComPort);
-                    return GetComPort();
+                    return SerialUtil.GetComPort();
                 }
                 else
                 {
@@ -193,68 +188,7 @@ namespace CsPiShock
             SendCommand("restart");
         }
 
-        private static string GetComPort()
-        {
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-            {
-                return GetComPortLin();
-            }
-            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                return GetComPortWin();
-            }
-
-            return "COM 3";
-        }
-
-        /// <summary>
-        /// Windows specific method of obtaining the COM port the PiShock is connected to
-        /// </summary>
-        /// <returns> COM port of the PiShock</returns>
-        /// <exception cref="Exception"></exception>
-        /// <exception cref="NullReferenceException"></exception>
-        [SupportedOSPlatform("windows")]
-        private static string GetComPortWin()
-        {
-            using var searcher = new ManagementObjectSearcher(
-                $"Select * From Win32_PnPEntity where PNPDeviceID Like '%{Convert.ToString(_usbIds[0].Item1, 16)}%' AND (PNPDeviceID Like '%{Convert.ToString(_usbIds[0].Item2, 16)}%' OR PNPDeviceID Like '%{Convert.ToString(_usbIds[1].Item2, 16)}%')");
-
-            using ManagementObjectCollection collection = searcher.Get();
-            //Console.WriteLine("Found " + collection.Count + " devices");
-            if (collection.Count > 1)
-            {
-                throw new Exception("Multiple devices found");
-            }
-
-            if (collection.Count == 0)
-            {
-                throw new Exception("No devices found");
-            }
-
-            ManagementBaseObject piShock = collection.Cast<ManagementBaseObject>().First();
-            if (piShock != null)
-            {
-                Console.WriteLine("Found PiShock: " + piShock["Caption"]);
-                string curCtrl = "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\";
-
-                String piShockPort =
-                    Registry.GetValue(curCtrl + "Enum\\" + piShock["PnpDeviceId"] + "\\Device Parameters", "PortName",
-                        "")!.ToString()!;
-                return piShockPort;
-            }
-
-            else
-            {
-                throw new NullReferenceException("The PiShock was found but it doesn't exist, this shouldn't happen");
-            }
-        }
-        //Checks the device file in Linux for the vendor and device ID
-        [SupportedOSPlatform("linux")]
-        private static string GetComPortLin()
-        {
-            return LinuxDeviceGetter.GetDeviceUsbPort(_usbIds);
-        }
-
+        
         /// <summary>
         /// Starts the thread that reads commands from the input queue and sends them to the PiShock
         /// </summary>
@@ -280,7 +214,7 @@ namespace CsPiShock
             }).Start();
         }
         
-        public void Operate(int shockerId, SerialOperation operation, int? duration = null, int? intensity = null)
+        internal void Operate(int shockerId, SerialOperation operation, int? duration = null, int? intensity = null)
         {
             OperationValues values = new OperationValues(shockerId, operation, duration, intensity);
             PiCommand cmd = new PiCommand("operate", values);

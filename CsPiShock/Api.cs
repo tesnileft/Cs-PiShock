@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace CsPiShock
 {
-    public abstract class ApiBase
+    public abstract class Api
     {
         ConcurrentQueue<PiCommand> _command_queue = new ConcurrentQueue<PiCommand>();
         CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();

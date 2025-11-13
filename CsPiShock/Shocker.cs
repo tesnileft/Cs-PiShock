@@ -62,7 +62,7 @@ public abstract class Shocker
         public int ShockerId { get; set; }
         public bool IsPaused { get; set; }
         public bool IsSerial { get; set; }
-        public BasicShockerInfo() //Diy lol
+        public BasicShockerInfo()
         { }
         public BasicShockerInfo(JObject data, string? name = null)
         {
@@ -76,19 +76,4 @@ public abstract class Shocker
             return $"Shocker {Name}, {ShockerId} from {ClientId}";
         }
     }
-}
-public class NotImplementedException : Exception
-{
-    public NotImplementedException()
-    {
-    }
-
-    public NotImplementedException(string message) : base(message)
-    {
-        
-    }
-    public NotImplementedException(string message, Exception innerException) : base(message, innerException)
-    {
-    }
-
 }
