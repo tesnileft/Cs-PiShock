@@ -97,15 +97,13 @@ public class WebSocketAPIv2 : Api
     /// <returns></returns>
     public async Task<bool> Unsubscribe(string[] targets)
     {
-
-        await Operate(new SubscribeOperation(targets, true));
+        var result = await Operate(new SubscribeOperation(targets, true));
         return true;
     }
 
-    //TODO
-    public async Task<bool> Publish()
+    internal async Task<bool> Publish(PublishCommand[] commands)
     {
-        await Operate(new PublishOperation([]));
+        await Operate(new PublishOperation(commands));
         return true;
     }
     
@@ -142,8 +140,8 @@ public class WebSocketAPIv2 : Api
 
     record PublishOperation : SocketOperation
     {
-        CommandBody[] PublishCommands { get; set; }
-        internal PublishOperation(CommandBody[] commands) : base("PUBLISH")
+        PublishCommand[] PublishCommands { get; set; }
+        internal PublishOperation(PublishCommand[] commands) : base("PUBLISH")
         {
             PublishCommands = commands;
         }
@@ -175,10 +173,10 @@ public class WebSocketAPIv2 : Api
     }
 }
 
-struct Command
+struct PublishCommand
 {
-    string Target;
-    CommandBody Body;
+    string Target; //for example c{clientId}-ops or c{clientId}-sops-{sharecode}
+    CommandBody Body; //Main body of the command
 }
 struct CommandBody
 {
